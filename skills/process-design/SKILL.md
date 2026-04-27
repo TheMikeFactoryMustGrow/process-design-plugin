@@ -288,6 +288,14 @@ Each agent receives the spec-in-progress (Phases 1–3 outputs) and returns a li
 
 If sub-agents are not available in the runtime, fall back to running 4.1–4.4 sequentially in this same conversation.
 
+**Mode logging.** Whichever execution mode runs — `task_fanout` (four parallel Task subagents) or `inline_simulation` (sequential, same context) — emit a telemetry event for it and reflect the mode in the Verification Record so a downstream reader knows without consulting session-notes:
+
+> **Phase 4 mode:** task_fanout — four parallel sub-agents returned independent gap lists, integrated in 4.5.
+
+or
+
+> **Phase 4 mode:** inline_simulation — Task tool unavailable; sub-types 4.1–4.4 run sequentially in this context. Adversarial isolation between sub-types is partial; treat 4.5 integration as lower-confidence than a fan-out pass.
+
 ### Gate 4 (Gap Probing Complete)
 
 The four input stress-test dimensions are: **missing**, **malformed**, **boundary**, **adversarial / unexpected combinations** (the last collapses 4.1's open-ended fifth question into the adversarial bucket).
@@ -379,6 +387,7 @@ Gate1 -->|fail| Retry
 - **Atomic claims.** Every decision rule, edge case, successor, and metric is one verifiable statement.
 - **Explicit successors.** Every step names possible next steps with testable conditions.
 - **Metrics referenced, not restated.** The procedure references "standard performance metrics" and named additions; full definitions live in the Metrics Map.
+- **No verifier-workaround commentary in the spec body.** If a `verify_spec.py` check appears to fail for a regex/parsing quirk rather than a real defect (e.g., an input order makes the script see a phantom violation), do **not** reshape the spec to dodge the bug. The spec is the build artifact; workaround commentary corrupts it. Instead: surface the script defect to the user, log it to `session-notes.md`, and either fix the script or accept the false fail and proceed with a soft fail logged to Assumptions. The spec describes the process, not the verifier's quirks.
 
 ### Gate 6 (Draft Complete — deterministic layer)
 
@@ -409,7 +418,16 @@ If the qa-agents skill ships a `process-spec` rubric, it will use that; otherwis
 - Auditor's borderline-flag list (low-confidence accepted findings)
 - A score line (Finder total, Auditor net, Referee net)
 
-**Do not re-implement the three-agent pattern here.**
+**Do not re-implement the three-agent pattern here when qa-agents is available.**
+
+**When qa-agents is unreachable.** Some runtimes lack the Skill tool or the Task subagent capability qa-agents requires. In that case, simulate the three-agent pattern inline using the rubric in this SKILL.md. **The simulation is structurally similar but adversarially weaker** — the agent doing the finding, auditing, and refereeing shares context with the agent that drafted the spec, so isolation is partial. The skill must still complete and produce its spec. But:
+
+- Log a telemetry event: `phase_7_mode: inline_simulation` (vs `phase_7_mode: skill_invocation` for the real path).
+- Add an explicit line to the spec's Verification Record:
+
+  > **Phase 7 simulation note:** qa-agents skill not reachable; finder/auditor/referee simulated inline. Adversarial isolation collapsed. Treat findings as lower-confidence than a real qa-agents pass; re-run Phase 7 against this spec from a runtime with subagent capability before treating the spec as production-grade.
+
+A downstream reviewer reading the spec must be able to see this without trusting the session notes alone — the spec is the build artifact, and confidence in its verification must be visible at the artifact level.
 
 ### Routing real findings back into the design loop
 
@@ -544,7 +562,7 @@ The skill captures its own session telemetry — gate fires, soft fails, qa-agen
 |---|---|---|
 | `session_start` | Skill invocation | `process_slug`, `build_target` |
 | `phase_start` | Each phase enters | `phase`, `phase_name` |
-| `phase_complete` | Each phase passes its gate | `phase`, `duration_ms` |
+| `phase_complete` | Each phase passes its gate | `phase`, `duration_ms`, `mode` (Phase 4 only: `task_fanout` \| `inline_simulation`; Phase 7 only: `skill_invocation` \| `inline_simulation`) |
 | `gate_hard_fail` | First failure of a gate check (before retry) | `phase`, `gate`, `check`, `detail` |
 | `gate_soft_fail` | After one retry failed; gap logged to Assumptions | `phase`, `gate`, `check`, `detail` |
 | `gate_pass` | Gate passes (after retry, if any) | `phase`, `gate` |

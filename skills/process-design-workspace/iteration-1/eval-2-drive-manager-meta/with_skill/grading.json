@@ -1,0 +1,140 @@
+{
+  "expectations": [
+    {
+      "text": "Spec file written to the expected output path",
+      "passed": true,
+      "evidence": "File exists at outputs/drive-manager-rule-update.process-spec.md"
+    },
+    {
+      "text": "verify_spec.py on the spec exits 0",
+      "passed": true,
+      "evidence": "Ran verify_spec.py without --final: 32 passed, 0 failed; exit code 0"
+    },
+    {
+      "text": "verify_spec.py --final on the spec exits 0",
+      "passed": true,
+      "evidence": "Ran verify_spec.py --final: 40 passed, 0 failed; exit code 0"
+    },
+    {
+      "text": "Frontmatter has status: verified",
+      "passed": true,
+      "evidence": "Line 7: 'status: verified'"
+    },
+    {
+      "text": "Frontmatter has build_target: python-script",
+      "passed": true,
+      "evidence": "Line 8: 'build_target: python-script'"
+    },
+    {
+      "text": "Trigger condition for the feedback loop is explicit (e.g. user moves file post-routing, or user flags mis-route)",
+      "passed": true,
+      "evidence": "Inputs section defines mis_route_signal from two explicit sources: '(a) FS-watcher that observed a file move from a drive-manager-placed location within STALE_THRESHOLD_HOURS (default 168h) of placement, or (b) explicit drive-manager:flag-mis-route <path> invocation'"
+    },
+    {
+      "text": "Output describes an updated routing rules artifact (file, table, or PR), not a re-routed file",
+      "passed": true,
+      "evidence": "Output anchor: 'An updated ~/.claude/plugins/drive-manager/routing-rules.yaml file with one new (or modified) rule' plus a 'diff artifact' for human review — the artifact is the rules file, not a re-routed file"
+    },
+    {
+      "text": "Procedure has at least one decision point that distinguishes 'flaky route, no rule change needed' from 'systemic miss, rule should change'",
+      "passed": true,
+      "evidence": "Decision Rules section: 'Is the proposed rule a duplicate, conflict, or unique?' — duplicate path leads to log_learning_event_only (no rule write); unique/conflict leads to regression_replay then write_proposal_diff. Also 'User intentionally moved file (re-organizing, NOT correcting a route)' edge case distinguishes flaky/incidental signals from real mis-routes via FAST_CORRECTION_HOURS window. dedupe_against_rules step explicitly classifies as duplicate vs. conflict vs. unique"
+    },
+    {
+      "text": "Mermaid block has at least 5 step nodes plus at least one GATE decision node",
+      "passed": true,
+      "evidence": "Mermaid has 15+ step nodes (S1–S15) plus 2 GATE decision nodes (G1: Gate-SignalValid, G2: Gate-HumanApproval), plus Start/terminal end nodes. Far exceeds the threshold."
+    },
+    {
+      "text": "Edge Cases include conflicting signals (two corrections disagree) or equivalent",
+      "passed": true,
+      "evidence": "Edge Cases table includes 'Two agents reach this design from different mis-routes simultaneously' and dedupe_against_rules handles 'conflict' (same match.pattern + different destination). Also 'User moves file twice (A→B→C)' handles successive disagreeing moves via T_settle defer."
+    },
+    {
+      "text": "Build handoff names Python-specific capture mechanisms (decorators, context managers, structured logging)",
+      "passed": true,
+      "evidence": "build-handoff.md line 11: 'Use decorators, context managers, structured logging libraries (e.g., structlog) for telemetry.' Spec Build Notes line 499 also names: 'Python decorators or context managers wrapping each step function; structured logging via structlog or stdlib logging with a JSONL formatter.'"
+    },
+    {
+      "text": "Decision rules are testable on input alone",
+      "passed": true,
+      "evidence": "All five decision rules have concrete criteria evaluable from inputs: signal staleness uses observed_at - placed_at >= 168; original log existence uses file_hash or file_path+timestamp; dedupe uses pattern+destination+content_predicate equality; regression uses pass_count/count >= 0.98; human approval uses filesystem move into approved/ folder. No subjective evaluation required."
+    },
+    {
+      "text": "Session notes describe each of the 8 phases",
+      "passed": true,
+      "evidence": "session-notes.md has explicit 'Phase 1 — Working Backwards' through 'Phase 8 — Build Handoff' headers, each with summary content (Gate pass/fail, soft fails count, key outputs). All 8 phases are described."
+    }
+  ],
+  "summary": {
+    "passed": 13,
+    "failed": 0,
+    "total": 13,
+    "pass_rate": 1.0
+  },
+  "qa_agents_review": {
+    "findings": [
+      {
+        "severity": 5,
+        "where": "Procedure step 12 apply_rule_on_approve + diagram edge S12 -->|hash race or lock timeout| S15",
+        "what": "Hash-race detection is supposed to retry from regression_replay (per Edge Cases table: 'Routing-rules.yaml modified mid-run ... Abort the apply; re-run from regression_replay against the new rule set; if still passes, retry apply'), but the procedure successors and the mermaid diagram both route hash-race and lock-timeout straight to abort_invalid. The two specifications contradict each other.",
+        "why_it_matters": "Implementer following the procedure/diagram will give up on transient YAML conflicts when a re-replay-then-retry was the spec's intent. Either the edge case is wrong or the procedure is — the build agent has no canonical tiebreaker."
+      },
+      {
+        "severity": 5,
+        "where": "Decision Rule 'Did regression_replay pass?' vs Output Metrics row 'replay_correctness_rate'",
+        "what": "regression_replay's pass criterion requires 'regression_replay_pass_count / regression_replay_count >= 0.98 AND target file routes to corrected_destination'. But the success criterion in the Output anchor sets two thresholds: replay_correctness_rate ≥ 95% on target file and regression_rate ≥ 98% on history. The 95% target threshold is meaningless for a single-file binary metric (it's either 0 or 1) — the spec mixes per-event binary scoring with a population threshold.",
+        "why_it_matters": "Implementer cannot tell whether to compute replay_correctness_rate as a per-event 0/1 (as Metrics Map says) or as a population rate (as the success criterion's 95% implies). This will cause divergence between the metric written to learning-events.jsonl and the metric used to judge process health."
+      },
+      {
+        "severity": 5,
+        "where": "Inputs / mis_route_signal validation",
+        "what": "The signal validation requires both destinations resolve under specific drive roots, listing only Google Drive, Linglepedia, and iCloud. But the existing drive-manager skill (per its own SKILL.md) supports both Google Drives (plural — multiple accounts per the Google MCP two-account split memory) and iCloud Drive. Hardcoding paths via the wildcard 'GoogleDrive-*' is fine, but Linglepedia is just one folder under iCloud — listing it separately as a 'drive root' is a category error and will cause valid corrected_destinations under non-Linglepedia iCloud paths to look like they are. Actually the iCloud path is listed too, so this is OK — but the Linglepedia path is technically inside iCloud and the order matters for resolution.",
+        "why_it_matters": "Edge case is minor but shows the spec's drive-root taxonomy hasn't been verified against the actual drive-manager plugin's known roots — this is exactly the A1 assumption flagged for build-time verification, but the validation logic is being committed to procedurally."
+      },
+      {
+        "severity": 5,
+        "where": "Edge Cases — 'User intentionally moved file (re-organizing, NOT correcting a route)'",
+        "what": "The decision criterion uses FAST_CORRECTION_HOURS=6 to distinguish corrections from re-organization, but this contradicts the main signal validation which uses STALE_THRESHOLD_HOURS=168 (1 week). Signals between 6h and 168h fall into a gray zone: stale_threshold says 'fresh enough to be a correction' but the edge-case rule says 'too late to be auto-trusted, route to log_learning_event with outcome=signal_low_confidence'. The procedure has no step that actually applies this 6h gate — it lives only in prose in the Edge Cases table.",
+        "why_it_matters": "A whole class of signals (6h–168h via fs_watcher) silently bypasses the proposal pipeline with no step in the procedure or successor edge in the diagram showing the divergence. Implementer either misses the gate or hand-codes it in violation of the canonical procedure."
+      },
+      {
+        "severity": 1,
+        "where": "Procedure step 5 load_rules — input list",
+        "what": "load_rules now lists process_inbox_log as an input (per the Pass 2 fix routing the effectiveness metric there) but does not declare a fallback successor for the case where process_inbox_log is missing or corrupted. extract_signals declares 'if file missing: → abort_invalid' but load_rules' equivalent path (log missing or unparseable) only handles 'YAML parse error'.",
+        "why_it_matters": "Minor — degraded mode for missing log is documented in the input validation, but the Procedure successor list doesn't reflect it."
+      },
+      {
+        "severity": 1,
+        "where": "Verification Suite — semantic checks routed to 'agent'",
+        "what": "Three semantic checks ('Decision rules resolve on input alone', 'Output is concrete', 'Spec matches design conversation intent') are listed as agent-verifiable but no agent invocation is referenced and no record of pass/fail appears in the Verification Record. The Verification Record only logs qa-agents passes, not these specific semantic checks.",
+        "why_it_matters": "The spec promises an agent verifies these but provides no audit trail. Reader cannot tell if they were actually run."
+      },
+      {
+        "severity": 5,
+        "where": "Decision Rule 'Did the human approve?' / Gate-HumanApproval polling",
+        "what": "Gate-HumanApproval polls 'proposals/approved/ and proposals/rejected/' every loop iteration with REVIEW_TIMEOUT_HOURS=168. There's no specification of poll frequency, no spec for what happens if the script exits before approval (does a daemon resume polling?), and no behavior for the 168h-but-script-was-killed-after-1h scenario. The spec implicitly assumes a long-running process but the build target is 'python-script' (singular run).",
+        "why_it_matters": "Build target / runtime model mismatch. A python-script that polls for 168 hours either leaks a process or requires a separate daemon/scheduler the spec doesn't mention. The implementer must invent a runtime contract."
+      },
+      {
+        "severity": 1,
+        "where": "Output anchor — 'rule_acceptance_rate ≥ 95%' implication",
+        "what": "Output success criterion says replay_correctness_rate ≥ 95% (binary per-event metric), but the Metrics Review Plan expects 'rule_acceptance_rate: expect 70±15% steady-state'. The two are different metrics but the framing is inconsistent — the success criterion's 95% bar will never trip because it's a per-event binary; the operational metric of interest is rule_acceptance_rate which is set at 70%.",
+        "why_it_matters": "Mostly a clarity/drafting issue but compounds with finding #2."
+      },
+      {
+        "severity": 1,
+        "where": "Build Notes — 'Stdlib + PyYAML only — no LLM dependency in v1'",
+        "what": "Constraint says no LLM, but propose_rule's heuristic ('match (filename_glob and/or pattern derived from filename, weighted toward generic over literal), content_predicate (a keyword set drawn from extracted signals)') is non-trivial and the spec gives no algorithmic detail. 'Weighted toward generic' is hand-wavy.",
+        "why_it_matters": "Implementer will either invent a weighting scheme that may not match Mike's expectations, or kick this back as ambiguous. The Pass 2 finding noted heuristic underspecification but routed it to drafting; arguably the propose_rule algorithm warrants its own decision rule."
+      },
+      {
+        "severity": 5,
+        "where": "Procedure / dedupe_against_rules dedupe + content_predicate logic",
+        "what": "Decision Rules say `duplicate` requires same pattern + same destination + same content_predicate. But dedupe_against_rules step description says 'scan for any rule whose match.pattern exactly equals proposed_rule's, regardless of destination. If equal pattern + same destination: skip ... If equal pattern + different destination: emit conflict'. The step omits content_predicate from the comparison; the decision rule includes it. This is a real spec/procedure mismatch.",
+        "why_it_matters": "Dedup classification will produce different results depending on which rule the implementer follows. Two rules with same pattern+destination but different content_predicates are 'duplicate' per step but 'unique' per decision rule (or vice versa)."
+      }
+    ],
+    "total_severity": 34
+  }
+}

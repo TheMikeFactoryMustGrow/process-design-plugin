@@ -1,0 +1,140 @@
+{
+  "expectations": [
+    {
+      "text": "Spec file written to the expected output path",
+      "passed": true,
+      "evidence": "File present at outputs/weekly-review.process-spec.md (verified via ls of outputs/ directory: build-handoff.md, session-notes.md, weekly-review.process-spec.md)."
+    },
+    {
+      "text": "verify_spec.py on the spec exits 0 (Gate 6 passes)",
+      "passed": true,
+      "evidence": "verify_spec.py (no --final): '32 passed, 0 failed' EXIT_CODE=0."
+    },
+    {
+      "text": "verify_spec.py --final on the spec exits 0 (all final assertions pass)",
+      "passed": true,
+      "evidence": "verify_spec.py --final: '40 passed, 0 failed' EXIT_CODE=0."
+    },
+    {
+      "text": "Frontmatter has status: verified",
+      "passed": true,
+      "evidence": "Line 7 of spec: 'status: verified'."
+    },
+    {
+      "text": "Cadence is named (Friday or weekly) somewhere in the spec",
+      "passed": true,
+      "evidence": "Line 17: 'A Friday-afternoon ritual...'; line 72: 'Mike has 30-45 minutes of focused time on Friday afternoon'; H1 title is 'Weekly Review'."
+    },
+    {
+      "text": "Output is a written review artifact (markdown / document), not a verb",
+      "passed": true,
+      "evidence": "Line 23: 'Concrete output: A markdown file weekly-review-YYYY-Www.md containing four populated sections - Shipped, Stuck, Drift Signals, Next-Week Focus - plus a metadata block'. Output is a noun (markdown file)."
+    },
+    {
+      "text": "Inputs include both the week's completed activity AND prior-week commitments",
+      "passed": true,
+      "evidence": "Inputs section names completed_items (line 37) and prior_review (line 47, 'parsed for its Next-Week Focus section'). Both are first-class documented inputs."
+    },
+    {
+      "text": "Process Health or Output metrics include at least one drift-detection signal (e.g. % commitments completed, focus-area continuity score, week-over-week velocity)",
+      "passed": true,
+      "evidence": "Output Metrics table line 83: 'commitments_carried_forward_pct | % of prior-week commitments explicitly resolved'; line 85: 'drift_signals_flagged_count'. Both are explicit drift-detection signals."
+    },
+    {
+      "text": "Mermaid block has at least 5 step nodes plus at least one GATE decision node",
+      "passed": true,
+      "evidence": "Mermaid block has 7 step nodes (G1, S2, S3, S4, S5, S6, S7) and 3 gates (Gate1 g.inputs_ok, Gate2 g.draft_ratifiable, Gate3 g.commitment_matches_confirmed). Exceeds threshold."
+    },
+    {
+      "text": "Edge Cases include 'commitment slipped' or equivalent recurring failure mode",
+      "passed": true,
+      "evidence": "Edge Cases table includes 'Commitment partially shipped' (line 262), 'Commitment rephrased' (line 263), and 'Zero commitments carried forward' (line 269 - 'prior_review had commitments, none matched'). All are commitment-slip equivalents."
+    },
+    {
+      "text": "Build handoff file exists and references the chosen target with appropriate capture mechanisms",
+      "passed": true,
+      "evidence": "build-handoff.md present. Line 32 names 'Build target: claude-code'. Line 11: 'Use hooks (PreToolUse, PostToolUse, Stop), MCP servers, structured tool result parsing for telemetry.' Capture mechanisms are appropriate to claude-code target."
+    },
+    {
+      "text": "Decision rules resolve on input alone (no 'use judgment' or vague criteria)",
+      "passed": true,
+      "evidence": "DR1 cites 'cosine-similarity-on-OpenAI-text-embedding-3-small-embeddings, threshold >=0.85'; DR2 defines tracked_hours_for_thread() formula and three numeric triggers (0.20, 0.05, subjective coverage); DR3 'age in days > 14 AND no text-diff in the last 7 days'; DR4 enumerates 4 named populated sections + 3-5 item count. No 'use judgment' language inside Decision Rules. (Note: Build Notes does say 'Use judgment on...' for implementation choices, but that's outside the Decision Rules section.)"
+    },
+    {
+      "text": "Session notes describe each of the 8 phases",
+      "passed": true,
+      "evidence": "session-notes.md headings: 'Phase 1 - Working Backwards', 'Phase 2 - Metrics Design', 'Phase 3 - Apply the Algorithm', 'Phase 4 - Probe for Gaps', 'Phase 5 - Verification Suite', 'Phase 6 - Draft + Gate 6', 'Phase 7 - Adversarial QA', 'Phase 8 - Build Handoff'. All 8 phases described."
+    }
+  ],
+  "summary": {
+    "passed": 13,
+    "failed": 0,
+    "total": 13,
+    "pass_rate": 1.0
+  },
+  "qa_agents_review": {
+    "findings": [
+      {
+        "severity": 5,
+        "where": "Inputs section, calendar input (lines 62-66) + Session notes Phase 6 fail #2 (lines 56-57)",
+        "what": "The author admits in session-notes that calendar was reordered to the end of the Inputs list specifically to dodge a regex bug in verify_spec.py's controllable-input check. The spec inserts a parenthetical at line 62 explaining the reordering as a structural property of the spec itself ('Listed last because it is the only non-controllable input - the script's controllable-input check is lazy-matched'). This pollutes the canonical artifact with grader-implementation detail to satisfy the structural grader; the spec is now coupled to the verifier's bug rather than to the process. A reader has no reason to know or care about the ordering rationale.",
+        "why_it_matters": "Specs should describe the process; verifier-conformance commentary is meta-noise that misleads downstream readers (and the build agent) about which constraints are real. If verify_spec.py is fixed, this comment becomes a stale lie."
+      },
+      {
+        "severity": 5,
+        "where": "Verification Record (lines 391-395) and session-notes Phase 7 (lines 61-89)",
+        "what": "Both QA Agents 'runs' were simulated inline by the same agent that drafted the spec ('Task tool unreachable -> followed SKILL.md scoring rubric directly'). The author's own skill-improvement note #3 (session-notes line 146) acknowledges this collapses the adversarial-isolation premise: 'the same agent that drafted F1-F12 also disproved them'. Yet the spec still claims status: verified on the strength of these self-graded runs. The Verification Record reads as if independent adversarial review occurred when it did not.",
+        "why_it_matters": "Adversarial review only works when the auditor has no investment in the artifact's correctness. A self-simulated qa-agents pass is at best a self-edit checklist; treating it as Verification Record evidence inflates the spec's apparent rigor and could let real defects through. The status: verified label rests partly on this fictive validation."
+      },
+      {
+        "severity": 5,
+        "where": "Decision Rule DR1 (line 228)",
+        "what": "DR1's threshold is 'fuzzy match with similarity >=0.85 under the cosine-similarity-on-OpenAI-text-embedding-3-small-embeddings convention (the build agent may swap the embedding model but must record the choice in the spec's Build Notes and re-tune the threshold).' Allowing the build agent to swap the embedding model AND re-tune the threshold means DR1 effectively reduces to 'pick a model and a threshold' - the canonical 0.85 number is decorative. Two builds of this spec would produce non-comparable commitments_carried_forward_pct values, defeating the DMAIC measurement premise.",
+        "why_it_matters": "This violates the assertion 'Decision rules resolve on input alone' in spirit even if it passes in letter. Build-time variability in core thresholds means the metric isn't actually deterministic across runs/builds, and trend analysis in the Metrics Review Plan becomes unreliable."
+      },
+      {
+        "severity": 5,
+        "where": "Edge Cases table, 'TODO secretly rewritten' row (line 261)",
+        "what": "Handling specifies a per-TODO history JSONL keyed by 'stable source-id (Asana task GID, vault file:line, etc.)'. But 'vault file:line' is NOT a stable identifier - any insertion above the TODO shifts every subsequent line number. The supposed stable key is the failure mode it's meant to detect (rewritten/moved TODOs).",
+        "why_it_matters": "The history-diff mechanism that backs identify.stuck for vault TODOs will silently misclassify any TODO that moved in its file as 'new', losing the entire purpose of the stuck-but-rewritten detection. This is a real bug seeded directly into the build handoff."
+      },
+      {
+        "severity": 5,
+        "where": "Mermaid diagram, Gate2 retry handling (lines 298-301)",
+        "what": "Gate2 has edges: 'fail and retries < 1' -> S6 (re-draft), 'fail and retries == 1' -> S7, 'pass' -> S7. The retry counter increment is not shown in the diagram - there is no edge that increments 'retries'. The diagram implies the counter springs into existence between traversals. The Gates table (line 210) says enforcement is 'by an integer counter in the orchestrator state, not by convention' - but the diagram doesn't model that state transition.",
+        "why_it_matters": "Diagram-spec mismatch. A build agent reading the diagram alone can't know how to implement the retry budget; reading the table contradicts the diagram. The 'no unbounded loops' verifier check passed only because the diagram structurally has finite outgoing edges, not because the retry semantics are correctly modeled."
+      },
+      {
+        "severity": 5,
+        "where": "DR2 + Inputs (calendar Required: no, line 64)",
+        "what": "DR2 defines drift-thread proportion using tracked_hours = calendar event durations + (completed_items count * 1-hour proxy when calendar degraded). When calendar IS available, completed_items contribute 0 hours unless they appear on the calendar. So a deep-work week with no meetings would show 0 tracked_hours total -> 0/0 division -> drift detection breaks. The degraded fallback only kicks in when calendar is fully unavailable, not when calendar is available-but-empty.",
+        "why_it_matters": "A common real-world scenario (focused solo week, light meeting load) breaks the drift detector silently. There's no edge case for 'calendar available but sparse'."
+      },
+      {
+        "severity": 1,
+        "where": "Output Metrics table (line 87) and Process Health (line 122)",
+        "what": "review_cycle_time_min is listed as an Output Metric ('end of ratify.and.write') AND End-to-end cycle time is listed as a Process Health metric ('Wallclock from session start to file written. Target <=45 min, hard cap 75 min.'). These are the same metric in two categories. The Metrics Map should not double-count.",
+        "why_it_matters": "Minor taxonomy issue but suggests the Metrics Map categories aren't cleanly separated, which weakens the DMAIC analysis."
+      },
+      {
+        "severity": 1,
+        "where": "Edge Cases, 'Mike walks away mid-ask.subjective' (line 267)",
+        "what": "Auto-fill triggers at 20 min wallclock with no input, but ask.subjective is the step that emits subjective_state for probe.drift's clause (iii). Auto-filling with '(skipped - Mike unavailable)' and specificity_score=0 means probe.drift can't fire its third trigger condition - degraded mode is implicit but not flagged in the artifact. The 20-min number is also unjustified vs. the 30-45 min total budget - a 20-min subjective wait alone consumes nearly half the target cycle time before timing out.",
+        "why_it_matters": "Threshold seems arbitrary and interacts poorly with the cycle-time budget. Also, auto-filling silently weakens drift detection without explicit downstream flagging."
+      },
+      {
+        "severity": 1,
+        "where": "Assumptions and Open Questions A8 (line 387)",
+        "what": "A8 says Phase 4 sub-agents weren't reachable so probes ran sequentially. This is process-design SKILL execution metadata, not a property of the weekly-review process being designed. It should be in session-notes (where it also appears), not in the spec itself. Conflates skill-trace with deliverable.",
+        "why_it_matters": "Pollutes the canonical spec with operational detail about how it was authored. Future readers building from this spec don't need to know the meta-process trace."
+      },
+      {
+        "severity": 1,
+        "where": "Verification Suite (line 330)",
+        "what": "Last row says 'Output metric commitments_carried_forward_pct is computable from inputs alone | structural | script (process-specific extension to verify_spec.py: ...)'. But this extension does not exist - verify_spec.py is the shared script and the spec promises a feature that hasn't been built. The check is effectively unverified.",
+        "why_it_matters": "Lists a verification check that won't actually run. Either build the extension or downgrade to 'agent semantic check'."
+      }
+    ],
+    "total_severity": 33
+  }
+}

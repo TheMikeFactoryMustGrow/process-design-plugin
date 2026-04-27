@@ -263,14 +263,17 @@ def verify(path: Path, final: bool) -> Result:
         )
 
     inputs_body = section(body, "Inputs") or ""
-    declared_inputs = re.findall(r"^\-\s+\*\*([^*]+)\*\*", inputs_body, re.MULTILINE)
-    inputs_with_validation = re.findall(
-        r"^\-\s+\*\*([^*]+)\*\*[\s\S]*?-\s*Validation:", inputs_body, re.MULTILINE
-    )
+    parsed_inputs = _parse_inputs(inputs_body)
+    declared_inputs = [i["name"] for i in parsed_inputs]
+    inputs_with_validation = [
+        i["name"] for i in parsed_inputs
+        if any(re.search(r"^\s*-\s*Validation:", line) for line in i["lines"])
+    ]
     res.check(
         "Every Input has documented validation",
         len(declared_inputs) == 0 or len(inputs_with_validation) == len(declared_inputs),
-        f"{len(inputs_with_validation)}/{len(declared_inputs)} inputs have a Validation line",
+        f"{len(inputs_with_validation)}/{len(declared_inputs)} inputs have a Validation line; "
+        f"missing: {[n for n in declared_inputs if n not in inputs_with_validation]}",
     )
 
     # Decision Rules: every entry should name a Criterion line.
@@ -314,10 +317,13 @@ def verify(path: Path, final: bool) -> Result:
     if cim_match:
         controllable_metrics_body = cim_match.group(1)
     if declared_inputs:
-        controllable_inputs = re.findall(
-            r"^\-\s+\*\*([^*]+)\*\*[\s\S]*?Controllable:\s*yes",
-            inputs_body, re.MULTILINE | re.IGNORECASE,
-        )
+        controllable_inputs = [
+            i["name"] for i in parsed_inputs
+            if any(
+                re.search(r"^\s*-\s*Controllable:\s*yes\b", line, re.IGNORECASE)
+                for line in i["lines"]
+            )
+        ]
         unmetricked = [i for i in controllable_inputs if i not in controllable_metrics_body]
         res.check(
             "Every controllable input has ≥1 tracked dimension",
@@ -342,6 +348,29 @@ def verify(path: Path, final: bool) -> Result:
 
 def _is_gate(label: str) -> bool:
     return "GATE" in label.upper()
+
+
+def _parse_inputs(inputs_body: str) -> list:
+    """Group an Inputs section into per-input blocks.
+
+    The section uses bullets like `- **input_name**:` followed by indented
+    sub-bullets (`- Controllable: yes`, `- Validation: ...`). We must group by
+    top-level bullet so checks like `Controllable: yes` don't leak across
+    input boundaries when one input says "no" and the next says "yes".
+    """
+    inputs: list = []
+    current: dict | None = None
+    for line in inputs_body.splitlines():
+        match = re.match(r"^-\s+\*\*([^*]+)\*\*", line)
+        if match:
+            if current is not None:
+                inputs.append(current)
+            current = {"name": match.group(1).strip(), "lines": []}
+        elif current is not None:
+            current["lines"].append(line)
+    if current is not None:
+        inputs.append(current)
+    return inputs
 
 
 def main(argv: list[str]) -> int:
