@@ -187,53 +187,68 @@ def verify(path: Path, final: bool) -> Result:
         )
 
         record = section(body, "Verification Record") or ""
-        record_has_qa = ("QA Agents" in record or "qa-agents" in record) and not re.search(
-            r"<[^>]+findings count[^>]*>", record  # template placeholder still present
-        )
+        # Strip HTML comments before checking for unfilled placeholders. Template
+        # instructions live inside `<!-- ... -->` blocks; placeholders inside
+        # those don't count as unfilled.
+        record_visible = re.sub(r"<!--[\s\S]*?-->", "", record)
+        unfilled_placeholders = re.findall(r"<[A-Z_][A-Z0-9_]*>", record_visible)
+        record_has_qa = ("QA Agents" in record_visible or "qa-agents" in record_visible) \
+            and not unfilled_placeholders
         res.check(
-            "qa-agents verification logged in Verification Record (no placeholder)",
+            "qa-agents verification logged in Verification Record (no <PLACEHOLDER> tokens)",
             record_has_qa,
+            f"unfilled placeholders: {sorted(set(unfilled_placeholders))}"
+            if unfilled_placeholders else "",
         )
 
-        # Tolerate markdown bold/italic/punctuation between the label and the
-        # mode token. The agent often writes `**Phase 4 mode:** inline_simulation`
-        # — the regex must skip past `**` and any whitespace.
-        phase4_mode = re.search(
-            r"Phase 4 mode\b[\s\S]{0,40}?(task_fanout|inline_simulation)\b",
-            record, re.IGNORECASE,
-        )
+        # Mode-line detection. The strategy:
+        #   1. Find the line that starts with "Phase N mode" (with optional bold).
+        #   2. On THAT line only, look for the mode token.
+        #   3. Reject template-shipped scaffolding like `Phase 4 mode: <PHASE_4_MODE>`
+        #      (the placeholder rejection above handles this when ANY <X> remains).
+        # We deliberately do NOT match across newlines — instructional commentary
+        # in adjacent bullets must not be picked up as the mode.
+        def _find_mode_line(record_text: str, label: str, allowed: list[str]) -> str | None:
+            line_re = re.compile(rf"^[^\n]*{re.escape(label)}[^\n]*$", re.MULTILINE | re.IGNORECASE)
+            for line in line_re.findall(record_text):
+                # skip lines inside the template's HTML comments (we already
+                # stripped them above for placeholder detection, but the raw
+                # `record` is searched here intentionally — instructional copy
+                # in plain prose can still mention modes).
+                # heuristic: a mode-line bullet begins with `-` and contains
+                # the label early. we use the line as-is and look for tokens.
+                tokens = []
+                for tok in allowed:
+                    if re.search(rf"\b{re.escape(tok)}\b", line):
+                        tokens.append(tok)
+                # exactly one mode declared → unambiguous; multiple → ambiguous
+                # (the template's "task_fanout (or inline_simulation if ...)"
+                # scaffolding is the canonical multi-token line).
+                if len(tokens) == 1:
+                    return tokens[0]
+            return None
+
+        phase4_choice = _find_mode_line(record_visible, "Phase 4 mode", ["task_fanout", "inline_simulation"])
         res.check(
-            "Phase 4 mode named in Verification Record (task_fanout | inline_simulation)",
-            phase4_mode is not None,
-            "missing 'Phase 4 mode: ...' line" if not phase4_mode else "",
+            "Phase 4 mode named in Verification Record (exactly one of task_fanout | inline_simulation)",
+            phase4_choice is not None,
+            "no unambiguous Phase 4 mode line — replace the <PHASE_4_MODE> placeholder with one token, not both",
         )
 
-        phase7_mode = re.search(
-            r"Phase 7 mode\b[\s\S]{0,40}?(skill_invocation|inline_simulation)\b",
-            record, re.IGNORECASE,
-        )
-        # Also accept the iter-2 format where the simulation note line appears
-        # without an explicit "Phase 7 mode:" prefix — e.g. "Phase 7 simulation note: ..."
-        # implies inline_simulation. The mode is whatever the spec encodes; if
-        # neither pattern is present, fail.
-        if phase7_mode is None and re.search(r"phase 7 simulation note", record, re.IGNORECASE):
-            class _M:  # tiny shim so the rest of the code can read .group(1)
-                def group(self, _): return "inline_simulation"
-            phase7_mode = _M()
+        phase7_choice = _find_mode_line(record_visible, "Phase 7 mode", ["skill_invocation", "inline_simulation"])
         res.check(
-            "Phase 7 mode named in Verification Record (skill_invocation | inline_simulation)",
-            phase7_mode is not None,
-            "missing 'Phase 7 mode: ...' line (or 'Phase 7 simulation note:' for inline mode)"
-            if not phase7_mode else "",
+            "Phase 7 mode named in Verification Record (exactly one of skill_invocation | inline_simulation)",
+            phase7_choice is not None,
+            "no unambiguous Phase 7 mode line — replace the <PHASE_7_MODE> placeholder with one token, not both",
         )
 
         # When Phase 7 ran in inline_simulation mode, the spec MUST carry an
         # explicit Simulation Note flagging lower confidence at the artifact
         # level (not just session notes).
-        if phase7_mode and phase7_mode.group(1).lower() == "inline_simulation":
+        if phase7_choice == "inline_simulation":
             sim_note = re.search(
                 r"(adversarial isolation collapsed|simulation note|simulated inline)",
-                record, re.IGNORECASE,
+                record_visible, re.IGNORECASE,
             )
             res.check(
                 "Phase 7 inline_simulation: Simulation Note present in Verification Record",

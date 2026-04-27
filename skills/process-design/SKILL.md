@@ -288,7 +288,7 @@ Each agent receives the spec-in-progress (Phases 1–3 outputs) and returns a li
 
 If sub-agents are not available in the runtime, fall back to running 4.1–4.4 sequentially in this same conversation.
 
-**Mode logging.** Whichever execution mode runs — `task_fanout` (four parallel Task subagents) or `inline_simulation` (sequential, same context) — emit a telemetry event for it and reflect the mode in the Verification Record so a downstream reader knows without consulting session-notes:
+**Mode logging.** Whichever execution mode runs — `task_fanout` (four parallel Task subagents) or `inline_simulation` (sequential, same context) — emit a `phase_complete` event with `phase: 4` and `detail.mode: task_fanout | inline_simulation` (single canonical telemetry shape), and reflect the mode in the Verification Record so a downstream reader knows without consulting session-notes:
 
 > **Phase 4 mode:** task_fanout — four parallel sub-agents returned independent gap lists, integrated in 4.5.
 
@@ -387,7 +387,7 @@ Gate1 -->|fail| Retry
 - **Atomic claims.** Every decision rule, edge case, successor, and metric is one verifiable statement.
 - **Explicit successors.** Every step names possible next steps with testable conditions.
 - **Metrics referenced, not restated.** The procedure references "standard performance metrics" and named additions; full definitions live in the Metrics Map.
-- **No verifier-workaround commentary in the spec body.** If a `verify_spec.py` check appears to fail for a regex/parsing quirk rather than a real design defect, do **not** reshape the spec to dodge the bug. The spec is the build artifact; workaround commentary corrupts it. Instead: surface the script defect to the user, log it to `session-notes.md`, and **either fix the script before continuing, or treat the false fail as a script defect (not a soft fail)** — verifier-bug-induced failures are not counted toward the soft-fail accumulator (they reflect a script bug, not a design gap). Mark such entries in `session-notes.md` as `verifier_bug: true` so the threshold-3 surfacing doesn't fire on script noise. The spec describes the process, not the verifier's quirks.
+- **No verifier-workaround commentary in the spec body.** If a `verify_spec.py` check appears to fail for a regex/parsing quirk rather than a real design defect, do **not** reshape the spec to dodge the bug. The spec is the build artifact; workaround commentary corrupts it. Instead: surface the script defect to the user, log it to `session-notes.md`, and either fix the script before continuing, or treat the false fail as a script defect — but only if the carve-out has been earned. **Verifier-bug carve-out is not a free pass.** To exclude a check failure from the soft-fail accumulator, the agent must record three things in a separate `verifier_bugs.md` alongside session-notes: (a) the exact failing check name and the spec content that triggered it, (b) a concrete repro the user can run (`echo "<spec snippet>" | verify_spec.py /dev/stdin`) that demonstrates the script bug, and (c) a description of the input the script *would* have passed if not buggy. Without all three, the failure counts as a regular soft fail and contributes to the threshold-3 accumulator. The carve-out exists to keep script noise out of the user's quality-debt signal — not to give the agent license to dismiss inconvenient design gaps as bugs.
 
 ### Gate 6 (Draft Complete — deterministic layer)
 
@@ -431,7 +431,7 @@ A downstream reviewer reading the spec must be able to see this without trusting
 
 ### Routing real findings back into the design loop
 
-For each confirmed finding, route by **finding type** — not by your reading of the prose. **Routing is non-negotiable** — the wrong phase wastes a retry and risks layering the fix on top of broken upstream work:
+For each confirmed finding, route by **finding type** — not by your reading of the prose. **Routing is binding when Phase 7 ran in `skill_invocation` mode** (real qa-agents, real adversarial isolation) — the wrong phase wastes a retry and risks layering the fix on top of broken upstream work. **In `inline_simulation` mode the routing weakens** (see "Inline-simulation lowers confidence in routing" below) — Auditor disprovals become advisory and borderline findings route to Assumptions instead of upstream phases.
 
 | Finding type | Loop back to |
 |---|---|
@@ -532,6 +532,7 @@ Run by `verify_spec.py --final` after Phase 7 has promoted the spec to `status: 
 | Phase 4 mode named in Verification Record | Yes | Phase 6 (drafting fix — add the mode line) |
 | Phase 7 mode named in Verification Record | Yes | Phase 6 (drafting fix — add the mode line) |
 | Phase 7 inline_simulation: Simulation Note present | Yes (only if Phase 7 mode = inline_simulation) | Phase 6 (drafting fix — add the Simulation Note) |
+| Inputs section parses into ≥1 input declaration when non-empty | Yes | Phase 6 (drafting fix — bullet syntax must be `- **name**: …` at column 0) |
 
 `verify_spec.py --final` is the executable definition of this table. SKILL.md and the script must change together — drift is a defect.
 

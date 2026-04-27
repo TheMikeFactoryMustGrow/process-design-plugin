@@ -1,0 +1,75 @@
+{
+  "expectations": [
+    {
+      "text": "Spec file written to the expected output path",
+      "passed": true,
+      "evidence": "weekly-review-process.md exists in outputs/ — a process spec was written, though not in the process-design plugin's canonical path or filename"
+    },
+    {
+      "text": "verify_spec.py on the spec exits 0 (Gate 6 passes)",
+      "passed": false,
+      "evidence": "baseline didn't produce a spec in process-design format — no frontmatter, no canonical sections (Mermaid block, Edge Cases, etc.), so verify_spec.py would not exit 0"
+    },
+    {
+      "text": "verify_spec.py --final on the spec exits 0 (all final assertions pass)",
+      "passed": false,
+      "evidence": "baseline didn't produce a spec in process-design format — no frontmatter with status, no canonical structure for final assertions"
+    },
+    {
+      "text": "Frontmatter has status: verified",
+      "passed": false,
+      "evidence": "weekly-review-process.md has no YAML frontmatter at all — it uses bold-key lines like '**Status:** Active' but no frontmatter block, and 'Active' is not 'verified'"
+    },
+    {
+      "text": "Cadence is named (Friday or weekly) somewhere in the spec",
+      "passed": true,
+      "evidence": "Line 4: '**Cadence:** Weekly, Friday 3:00–3:45 PM (45-minute hard stop)' — both 'Weekly' and 'Friday' explicitly named"
+    },
+    {
+      "text": "Output is a written review artifact (markdown / document), not a verb",
+      "passed": true,
+      "evidence": "Section F line 91 specifies saving as 'weekly-review-YYYY-MM-DD.md' in the vault; the template file is structured as a markdown artifact; §10 says 'Each weekly review is a note in the vault'"
+    },
+    {
+      "text": "Inputs include both the week's completed activity AND prior-week commitments",
+      "passed": true,
+      "evidence": "§3 Inputs table includes both completed activity (Calendar last 7 days, Closed PRs/commits, Asana tasks closed this week, vault deltas) AND prior-week commitments ('The 3 commitments you made *to yourself* last Friday' and 'Last week's review file')"
+    },
+    {
+      "text": "Process Health or Output metrics include at least one drift-detection signal (e.g. % commitments completed, focus-area continuity score, week-over-week velocity)",
+      "passed": true,
+      "evidence": "Metric 1 'Top-3 Hit Rate' = (Done + 0.5 × Partial) / 3 is exactly a % commitments completed signal; Metric 2 stuck-item age tracks portfolio drift; Metric 3 hygiene score is a process-drift signal"
+    },
+    {
+      "text": "Mermaid block has at least 5 step nodes plus at least one GATE decision node",
+      "passed": false,
+      "evidence": "No Mermaid diagram present anywhere in weekly-review-process.md or template — baseline used markdown headings/tables instead of a flowchart"
+    },
+    {
+      "text": "Edge Cases include 'commitment slipped' or equivalent recurring failure mode",
+      "passed": true,
+      "evidence": "§7 'Anti-patterns' covers recurring failure modes including 'Aspirational top-3' (commitments slip because they were aspirational) and 'Stuck-item amnesia' (slipping items disappear); §6 trigger 'Top-3 hit rate red 2 weeks in a row' is the explicit commitment-slipped recurring-failure handler. Section A also explicitly scores commitments as Done/Partial/Not done/Abandoned."
+    },
+    {
+      "text": "Build handoff file exists and references the chosen target with appropriate capture mechanisms",
+      "passed": false,
+      "evidence": "No build-handoff file produced. session-notes.md is a design-rationale doc, not a build handoff; §8 references a future weekly-review-prep.sh but doesn't constitute a handoff file"
+    },
+    {
+      "text": "Decision rules resolve on input alone (no 'use judgment' or vague criteria)",
+      "passed": true,
+      "evidence": "Metric thresholds are concrete numbers (≥0.66 green, 0.34–0.65 yellow, ≤0.33 red; P50 ≤21 days; hygiene ≥3 green); §6 trigger conditions are all input-resolvable ('red 2 weeks in a row', 'same item red 3 weeks running', 'all three green for 8 consecutive weeks'); 'Done means a customer/teammate/system other than you experienced the change' is concrete. Hygiene rubric is binary +1 checks. No 'use judgment' language."
+    },
+    {
+      "text": "Session notes describe each of the 8 phases",
+      "passed": false,
+      "evidence": "session-notes.md describes the baseline's own design approach and decisions but does not describe 8 phases of the process-design plugin's workflow — baseline never ran an 8-phase workflow"
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 6,
+    "total": 13,
+    "pass_rate": 0.538
+  }
+}
