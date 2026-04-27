@@ -149,7 +149,7 @@ flowchart TD
     S1 --> S2["step_id: action description<br/><sub><i>req: person</i></sub>"]
     S2 --> Gate1{{"GATE: verification check"}}
     Gate1 -->|pass| S3["step_id: action<br/><sub><i>req: person</i></sub>"]
-    Gate1 -->|fail| Retry["retry or escalate"]
+    Gate1 -->|fail| Retry["retry or escalate<br/><sub><i>req: person</i></sub>"]
     S3 --> End(["Terminal state"])
 ```
 

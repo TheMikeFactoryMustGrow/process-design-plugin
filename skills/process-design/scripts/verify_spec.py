@@ -63,10 +63,13 @@ def read_spec(path: Path) -> tuple[dict, str]:
             continue
         kv = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$", line)
         if kv:
-            key, value = kv.group(1), kv.group(2).strip()
-            if value.startswith("#"):
-                value = ""
-            fm[key] = value.strip("'\"") if value else ""
+            key, value = kv.group(1), kv.group(2)
+            # Strip inline `# comment` (preserving `#` inside quotes is over-engineering for our use).
+            comment_idx = value.find("#")
+            if comment_idx >= 0:
+                value = value[:comment_idx]
+            value = value.strip().strip("'\"")
+            fm[key] = value
             current_key = key
         elif line.startswith("  - ") and current_key:
             fm.setdefault(current_key + "_list", []).append(line[4:].strip())
@@ -149,10 +152,25 @@ def verify(path: Path, final: bool) -> Result:
         )
 
     edge_cases_body = section(body, "Edge Cases") or ""
-    res.check(
-        "Edge Cases section non-empty",
-        bool(re.search(r"^\s*\|", edge_cases_body, re.MULTILINE)),
-    )
+    edge_case_rows = [
+        line for line in edge_cases_body.splitlines()
+        if line.startswith("|") and not line.startswith("|---") and "Edge case" not in line
+    ]
+    if final:
+        # In --final mode, reject template-placeholder rows (`<...>`) as
+        # not-real edge cases. A draft with placeholders passes Gate 6 but
+        # cannot be promoted to verified.
+        real_rows = [r for r in edge_case_rows if not re.search(r"<[^>]+>", r)]
+        res.check(
+            "Edge Cases section has real content (not just placeholders)",
+            len(real_rows) >= 1,
+            f"{len(real_rows)} content rows out of {len(edge_case_rows)} table rows",
+        )
+    else:
+        res.check(
+            "Edge Cases section non-empty",
+            bool(edge_case_rows),
+        )
 
     if final:
         build_notes = section(body, "Build Notes") or ""
@@ -181,13 +199,21 @@ def verify(path: Path, final: bool) -> Result:
         res.check("Mermaid block parses without errors", not graph.errors,
                   "; ".join(graph.errors))
 
+        # Step nodes (rectangles) require owner annotations. Gates (hexagons,
+        # `{{...}}`) and terminal stadium nodes are exempt by spec convention —
+        # gates' accountability is in the verification method; terminals are
+        # end states, not requirements.
         owner_pattern = re.compile(r"req\s*:", re.IGNORECASE)
-        nodes_with_owners = sum(1 for label in graph.nodes.values() if owner_pattern.search(label))
-        non_terminal_nodes = [n for n in graph.nodes if n not in graph.terminals]
+        step_nodes = [
+            n for n in graph.nodes
+            if n not in graph.terminals and not _is_gate(graph.nodes.get(n, ""))
+        ]
+        annotated = [n for n in step_nodes if owner_pattern.search(graph.nodes.get(n, ""))]
         res.check(
-            "Every non-terminal node displays owner annotation",
-            all(owner_pattern.search(graph.nodes.get(n, "")) for n in non_terminal_nodes if not _is_gate(graph.nodes.get(n, ""))),
-            f"{nodes_with_owners}/{len(non_terminal_nodes)} non-terminal nodes annotated",
+            "Every step node (non-gate, non-terminal) displays owner annotation",
+            len(annotated) == len(step_nodes),
+            f"{len(annotated)}/{len(step_nodes)} step nodes annotated; "
+            f"missing: {sorted(set(step_nodes) - set(annotated))}",
         )
 
         reachable = parse_mermaid.reachable_terminals(graph)
@@ -197,9 +223,26 @@ def verify(path: Path, final: bool) -> Result:
             f"declared terminals: {sorted(graph.terminals)}, reachable: {sorted(reachable)}",
         )
 
+        unreachable = parse_mermaid.unreachable_nodes(graph)
+        res.check(
+            "No unreachable nodes",
+            not unreachable,
+            f"unreachable: {sorted(unreachable)}",
+        )
+
+        loops = parse_mermaid.unbounded_loops(graph)
+        res.check(
+            "No unbounded loops (cycles with no exit edge)",
+            not loops,
+            "; ".join(sorted(",".join(sorted(scc)) for scc in loops)),
+        )
+
     procedure = section(body, "Procedure (Canonical)") or ""
-    declared_step_ids = set(re.findall(r"^\d+\.\s+\*\*([A-Za-z_][A-Za-z0-9_]*)\*\*", procedure, re.MULTILINE))
-    referenced = set(re.findall(r"→\s*([A-Za-z_][A-Za-z0-9_]*)", procedure))
+    # Allow snake_case, kebab-case, dot-paths, and ASCII identifiers in step IDs.
+    declared_step_ids = set(re.findall(
+        r"^\s*\d+\.\s+\*\*([A-Za-z_][A-Za-z0-9_.\-]*)\*\*", procedure, re.MULTILINE
+    ))
+    referenced = set(re.findall(r"→\s*([A-Za-z_][A-Za-z0-9_.\-]*)", procedure))
     missing_refs = referenced - declared_step_ids - {"Terminal", "End", "terminal", "end"}
     res.check(
         "All step ID references in Procedure resolve",
@@ -207,11 +250,91 @@ def verify(path: Path, final: bool) -> Result:
         f"missing: {sorted(missing_refs)}" if missing_refs else "",
     )
 
-    standard_metrics_refs = procedure.count("standard performance")
+    if block is not None and declared_step_ids:
+        # Cross-link procedure step IDs to diagram nodes: each procedure step
+        # must appear by ID-token (or as the bold-name prefix) in at least one
+        # diagram node's label.
+        diagram_label_text = " | ".join(graph.nodes.values())
+        unlinked = sorted(s for s in declared_step_ids if s not in diagram_label_text)
+        res.check(
+            "Every Procedure step ID appears in the diagram",
+            not unlinked,
+            f"missing in diagram: {unlinked}" if unlinked else "",
+        )
+
+    inputs_body = section(body, "Inputs") or ""
+    declared_inputs = re.findall(r"^\-\s+\*\*([^*]+)\*\*", inputs_body, re.MULTILINE)
+    inputs_with_validation = re.findall(
+        r"^\-\s+\*\*([^*]+)\*\*[\s\S]*?-\s*Validation:", inputs_body, re.MULTILINE
+    )
     res.check(
-        "Every step references standard performance metrics",
+        "Every Input has documented validation",
+        len(declared_inputs) == 0 or len(inputs_with_validation) == len(declared_inputs),
+        f"{len(inputs_with_validation)}/{len(declared_inputs)} inputs have a Validation line",
+    )
+
+    # Decision Rules: every entry should name a Criterion line.
+    decision_rules_body = section(body, "Decision Rules") or ""
+    decision_blocks = re.findall(r"^\*\*([^*]+)\*\*", decision_rules_body, re.MULTILINE)
+    rules_with_criterion = decision_rules_body.count("Criterion:")
+    res.check(
+        "Every Decision Rule has a Criterion",
+        len(decision_blocks) == 0 or rules_with_criterion >= len(decision_blocks),
+        f"{rules_with_criterion} criteria for {len(decision_blocks)} rules",
+    )
+
+    # Gates table: each gate row must have a non-empty Method column.
+    gates_body = section(body, "Gates (Verification Decisions in the Process)") or ""
+    gate_rows = [
+        line for line in gates_body.splitlines()
+        if line.startswith("|") and not line.startswith("|---") and "Gate ID" not in line
+    ]
+    gate_rows = [r for r in gate_rows if r.count("|") >= 6]  # 6 columns + leading/trailing pipes = 7 |s
+    methods_named = []
+    for row in gate_rows:
+        cols = [c.strip() for c in row.strip("|").split("|")]
+        if len(cols) >= 4:
+            method = cols[3]
+            if method and not method.startswith("<"):
+                methods_named.append(row)
+    res.check(
+        "Every Gate row names a verification Method",
+        len(gate_rows) == 0 or len(methods_named) == len(gate_rows),
+        f"{len(methods_named)}/{len(gate_rows)} gate rows name a method",
+    )
+
+    # Cross-ref: every controllable input has at least one Controllable Input
+    # Metric dimension (we look for the input name appearing in the
+    # Controllable Input Metrics subsection).
+    controllable_metrics_body = ""
+    cim_match = re.search(
+        r"###\s+Controllable Input Metrics(.*?)(?=^###\s|^##\s|\Z)",
+        body, re.DOTALL | re.MULTILINE,
+    )
+    if cim_match:
+        controllable_metrics_body = cim_match.group(1)
+    if declared_inputs:
+        controllable_inputs = re.findall(
+            r"^\-\s+\*\*([^*]+)\*\*[\s\S]*?Controllable:\s*yes",
+            inputs_body, re.MULTILINE | re.IGNORECASE,
+        )
+        unmetricked = [i for i in controllable_inputs if i not in controllable_metrics_body]
+        res.check(
+            "Every controllable input has ≥1 tracked dimension",
+            not unmetricked,
+            f"missing dimensions for: {unmetricked}" if unmetricked else "",
+        )
+
+    # Match either `standard performance` or the abbreviated `standard set`,
+    # case-insensitive — the SKILL.md uses both interchangeably as canonical
+    # ways of referencing the per-step performance metrics block.
+    standard_metrics_pattern = re.compile(r"\bstandard\s+(performance|set)\b", re.IGNORECASE)
+    standard_metrics_refs = len(standard_metrics_pattern.findall(procedure))
+    res.check(
+        "Every step references the standard performance metrics block",
         len(declared_step_ids) == 0 or standard_metrics_refs >= len(declared_step_ids),
-        f"{standard_metrics_refs} mentions for {len(declared_step_ids)} steps",
+        f"{standard_metrics_refs} mentions of `standard performance` or `standard set` "
+        f"for {len(declared_step_ids)} steps",
     )
 
     return res

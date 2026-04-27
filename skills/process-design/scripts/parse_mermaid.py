@@ -117,19 +117,16 @@ def parse(mermaid_src: str) -> Graph:
     return g
 
 
-def reachable_terminals(g: Graph, start: str | None = None) -> set:
-    """BFS from `start` (or any node with no incoming edge) to find which
-    declared terminal nodes are reachable."""
+def reachable_from_roots(g: Graph) -> set:
+    """Set of all nodes reachable from any root (nodes with no incoming edge).
+    If no roots exist (every node has an incoming edge), starts from the first
+    declared node — this can only happen when the graph is one big cycle."""
     if not g.nodes:
         return set()
     incoming = {n: 0 for n in g.nodes}
-    for a, b in g.edges:
+    for _, b in g.edges:
         incoming[b] = incoming.get(b, 0) + 1
-    if start is None:
-        roots = [n for n, c in incoming.items() if c == 0] or [next(iter(g.nodes))]
-    else:
-        roots = [start]
-
+    roots = [n for n, c in incoming.items() if c == 0] or [next(iter(g.nodes))]
     seen = set()
     stack = list(roots)
     while stack:
@@ -140,7 +137,80 @@ def reachable_terminals(g: Graph, start: str | None = None) -> set:
         for a, b in g.edges:
             if a == node and b not in seen:
                 stack.append(b)
-    return seen & g.terminals
+    return seen
+
+
+def reachable_terminals(g: Graph) -> set:
+    return reachable_from_roots(g) & g.terminals
+
+
+def unreachable_nodes(g: Graph) -> set:
+    """Nodes that exist but cannot be reached from any root."""
+    return set(g.nodes) - reachable_from_roots(g)
+
+
+def unbounded_loops(g: Graph) -> list:
+    """Strongly-connected components of size >1 with no edge leaving the SCC.
+    A cycle that has at least one outgoing edge to a node outside is bounded
+    (the process can leave). A cycle with no exit is an infinite loop.
+
+    Returns a list of frozensets, one per SCC found."""
+    # Tarjan's SCC algorithm.
+    index_counter = [0]
+    stack: list = []
+    on_stack = set()
+    indices: dict = {}
+    lowlinks: dict = {}
+    sccs: list = []
+
+    successors: dict = {n: [] for n in g.nodes}
+    for a, b in g.edges:
+        if a in successors:
+            successors[a].append(b)
+
+    def strongconnect(node):
+        indices[node] = index_counter[0]
+        lowlinks[node] = index_counter[0]
+        index_counter[0] += 1
+        stack.append(node)
+        on_stack.add(node)
+        for succ in successors.get(node, []):
+            if succ not in indices:
+                strongconnect(succ)
+                lowlinks[node] = min(lowlinks[node], lowlinks[succ])
+            elif succ in on_stack:
+                lowlinks[node] = min(lowlinks[node], indices[succ])
+        if lowlinks[node] == indices[node]:
+            component = []
+            while True:
+                w = stack.pop()
+                on_stack.discard(w)
+                component.append(w)
+                if w == node:
+                    break
+            sccs.append(frozenset(component))
+
+    for node in g.nodes:
+        if node not in indices:
+            strongconnect(node)
+
+    unbounded = []
+    for scc in sccs:
+        if len(scc) < 2:
+            # singleton: unbounded only if it has a self-loop with no other exit
+            (only,) = scc
+            outgoing = [b for a, b in g.edges if a == only]
+            self_loops = [b for b in outgoing if b == only]
+            if self_loops and len(outgoing) == len(self_loops):
+                unbounded.append(scc)
+            continue
+        # SCC of size >= 2: unbounded iff no edge leaves the component
+        outgoing_to_outside = [
+            (a, b) for a, b in g.edges if a in scc and b not in scc
+        ]
+        if not outgoing_to_outside:
+            unbounded.append(scc)
+    return unbounded
 
 
 if __name__ == "__main__":
@@ -161,3 +231,10 @@ if __name__ == "__main__":
             print(f"  - {err}")
     reachable = reachable_terminals(graph)
     print(f"reachable terminals: {sorted(reachable) or '(none)'}")
+    unreachable = unreachable_nodes(graph)
+    if unreachable:
+        print(f"unreachable nodes: {sorted(unreachable)}")
+    loops = unbounded_loops(graph)
+    if loops:
+        for scc in loops:
+            print(f"unbounded loop: {sorted(scc)}")
