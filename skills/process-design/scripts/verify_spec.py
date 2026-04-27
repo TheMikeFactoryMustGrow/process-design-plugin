@@ -225,7 +225,7 @@ def verify(path: Path, final: bool) -> Result:
             )
             candidates = []
             for line in line_re.findall(record_text):
-                tokens = [tok for tok in allowed if re.search(rf"\b{re.escape(tok)}\b", line)]
+                tokens = [tok for tok in allowed if re.search(rf"\b{re.escape(tok)}\b", line, re.IGNORECASE)]
                 if len(tokens) == 1:
                     candidates.append(tokens[0])
             if len(candidates) == 1:

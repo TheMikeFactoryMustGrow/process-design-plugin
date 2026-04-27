@@ -288,13 +288,19 @@ Each agent receives the spec-in-progress (Phases 1–3 outputs) and returns a li
 
 If sub-agents are not available in the runtime, fall back to running 4.1–4.4 sequentially in this same conversation.
 
-**Mode logging.** Whichever execution mode runs — `task_fanout` (four parallel Task subagents) or `inline_simulation` (sequential, same context) — emit a `phase_complete` event with `phase: 4` and `detail.mode: task_fanout | inline_simulation` (single canonical telemetry shape), and reflect the mode in the Verification Record so a downstream reader knows without consulting session-notes:
+**Mode logging.** Whichever execution mode runs — `task_fanout` (four parallel Task subagents) or `inline_simulation` (sequential, same context) — emit a `phase_complete` event with `phase: 4` and `detail.mode: task_fanout | inline_simulation` (single canonical telemetry shape), and reflect the mode in the Verification Record as a **top-level bullet** (the verifier requires the bullet form, not blockquote prose):
 
-> **Phase 4 mode:** task_fanout — four parallel sub-agents returned independent gap lists, integrated in 4.5.
+```markdown
+- Phase 4 mode: task_fanout
+```
 
 or
 
-> **Phase 4 mode:** inline_simulation — Task tool unavailable; sub-types 4.1–4.4 run sequentially in this context. Adversarial isolation between sub-types is partial; treat 4.5 integration as lower-confidence than a fan-out pass.
+```markdown
+- Phase 4 mode: inline_simulation
+```
+
+Optional context can follow on the same line after the token (e.g., `- Phase 4 mode: inline_simulation — Task tool unavailable; sub-types ran sequentially`), as long as the line contains exactly one of `task_fanout` or `inline_simulation`.
 
 ### Gate 4 (Gap Probing Complete)
 
