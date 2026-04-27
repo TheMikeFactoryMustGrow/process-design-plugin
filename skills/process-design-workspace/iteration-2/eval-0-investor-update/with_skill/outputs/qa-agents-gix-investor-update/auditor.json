@@ -1,0 +1,30 @@
+{
+  "verdicts": [
+    {"id": "F1", "verdict": "ACCEPT"},
+    {
+      "id": "F2",
+      "verdict": "DISPROVE",
+      "counter_claim": "The day-44 case is named in the Send-window edge-case row and routes to escalate_to_mike. The relationship is implicitly: gate_greg_approval runs first; if Greg has not fully approved, it loops or escalates; only on full approval does pre_send_checklist run. The day-44-with-partial-approval case never reaches gate_pre_send because it's caught one gate earlier.",
+      "evidence": "Procedure step 5 successors: gate_greg_approval branches on edit_rounds >= 2 or silent > 7d to escalate_to_mike. The 'partial approval' state is by definition unsuccessful at gate_greg_approval, so it never reaches gate_pre_send.",
+      "confidence": 6
+    },
+    {"id": "F3", "verdict": "ACCEPT"},
+    {"id": "F4", "verdict": "ACCEPT"},
+    {
+      "id": "F5",
+      "verdict": "DISPROVE",
+      "counter_claim": "The validation criterion is on the input bundle, not a quality gate. Failing validation routes to escalate_to_mike, where Mike's documented role is to make the call — including 'send anyway with sparse highlights this quarter'. That is the designed behavior, not a defect.",
+      "evidence": "Procedure step 8 (escalate_to_mike): 'write a structured escalation note... wait for instruction'. Mike has decision rights to override.",
+      "confidence": 5
+    },
+    {"id": "F6", "verdict": "ACCEPT"},
+    {"id": "F7", "verdict": "ACCEPT"},
+    {"id": "F8", "verdict": "ACCEPT"}
+  ],
+  "weakest_accepted": [
+    {
+      "id": "F3",
+      "concern": "comments_accepted_pct is genuinely a leading indicator; calling it vanity is borderline. If acceptance pct is reviewed alongside greg_edit_rounds it's signal — only in isolation is it vanity. The Auditor was tempted to disprove on this point but the spec does not couple the two metrics in the Review Plan, so the Finder's concern stands."
+    }
+  ]
+}

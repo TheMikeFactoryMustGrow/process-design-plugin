@@ -387,7 +387,7 @@ Gate1 -->|fail| Retry
 - **Atomic claims.** Every decision rule, edge case, successor, and metric is one verifiable statement.
 - **Explicit successors.** Every step names possible next steps with testable conditions.
 - **Metrics referenced, not restated.** The procedure references "standard performance metrics" and named additions; full definitions live in the Metrics Map.
-- **No verifier-workaround commentary in the spec body.** If a `verify_spec.py` check appears to fail for a regex/parsing quirk rather than a real defect (e.g., an input order makes the script see a phantom violation), do **not** reshape the spec to dodge the bug. The spec is the build artifact; workaround commentary corrupts it. Instead: surface the script defect to the user, log it to `session-notes.md`, and either fix the script or accept the false fail and proceed with a soft fail logged to Assumptions. The spec describes the process, not the verifier's quirks.
+- **No verifier-workaround commentary in the spec body.** If a `verify_spec.py` check appears to fail for a regex/parsing quirk rather than a real design defect, do **not** reshape the spec to dodge the bug. The spec is the build artifact; workaround commentary corrupts it. Instead: surface the script defect to the user, log it to `session-notes.md`, and **either fix the script before continuing, or treat the false fail as a script defect (not a soft fail)** — verifier-bug-induced failures are not counted toward the soft-fail accumulator (they reflect a script bug, not a design gap). Mark such entries in `session-notes.md` as `verifier_bug: true` so the threshold-3 surfacing doesn't fire on script noise. The spec describes the process, not the verifier's quirks.
 
 ### Gate 6 (Draft Complete — deterministic layer)
 
@@ -422,7 +422,7 @@ If the qa-agents skill ships a `process-spec` rubric, it will use that; otherwis
 
 **When qa-agents is unreachable.** Some runtimes lack the Skill tool or the Task subagent capability qa-agents requires. In that case, simulate the three-agent pattern inline using the rubric in this SKILL.md. **The simulation is structurally similar but adversarially weaker** — the agent doing the finding, auditing, and refereeing shares context with the agent that drafted the spec, so isolation is partial. The skill must still complete and produce its spec. But:
 
-- Log a telemetry event: `phase_7_mode: inline_simulation` (vs `phase_7_mode: skill_invocation` for the real path).
+- Telemetry: emit a `phase_complete` event with `phase: 7` and `detail.mode: inline_simulation` (the real path emits the same event with `detail.mode: skill_invocation`). One canonical event shape — see the Telemetry section.
 - Add an explicit line to the spec's Verification Record:
 
   > **Phase 7 simulation note:** qa-agents skill not reachable; finder/auditor/referee simulated inline. Adversarial isolation collapsed. Treat findings as lower-confidence than a real qa-agents pass; re-run Phase 7 against this spec from a runtime with subagent capability before treating the spec as production-grade.
@@ -445,6 +445,13 @@ For each confirmed finding, route by **finding type** — not by your reading of
 | `unbounded-loop` — Gate 6 should have caught; if Phase 7 finds one, treat as Gate 6 escape and patch the script | Phase 6 + open issue against `verify_spec.py` |
 | `internal-contradiction` — prose says X here, Y there | The earlier of the two contradicting phases (treat the later as the inheritor) |
 | `other` — finding doesn't fit | Surface to user — judgment call needed |
+
+**Inline-simulation lowers confidence in routing.** When Phase 7 ran in `inline_simulation` mode, the Auditor shares context with the drafter. That makes false negatives more likely (an Auditor disprovals a real finding using the drafter's own reasoning). Two adjustments apply only in inline-simulation mode:
+
+1. **Auditor disprovals are advisory, not authoritative.** Treat any Finder finding the inline Auditor "disproved" as a borderline finding the user should examine before dismissal. Surface it.
+2. **Borderline findings route to Assumptions, not upstream phases.** A medium-severity finding the inline simulator marked borderline should be logged to "Assumptions and Open Questions" with `inline_simulation_borderline: true`, not loop back to Phase 1–5. Re-run Phase 7 from a real-isolation runtime later to resolve.
+
+In `skill_invocation` mode the routing table applies as-is.
 
 After a fix, always re-run Gate 6 (structural layer must re-pass on any draft mutation). Re-invoke qa-agents (full Phase 7) under any of these conditions:
 
@@ -521,30 +528,12 @@ Run by `verify_spec.py --final` after Phase 7 has promoted the spec to `status: 
 | No unbounded loops | Yes | Phase 6 (drafting fix) — add an exit edge |
 | Edge Case section non-empty with content (not just placeholder rows) | Yes | Phase 4 |
 | Build Notes section non-empty | Yes | Phase 6 (drafting fix) |
-| qa-agents verification logged in Verification Record | Yes | Phase 7 (re-run; see Promotion above) |
+| qa-agents verification logged in Verification Record (no placeholder) | Yes | Phase 7 (re-run; see Promotion above) |
+| Phase 4 mode named in Verification Record | Yes | Phase 6 (drafting fix — add the mode line) |
+| Phase 7 mode named in Verification Record | Yes | Phase 6 (drafting fix — add the mode line) |
+| Phase 7 inline_simulation: Simulation Note present | Yes (only if Phase 7 mode = inline_simulation) | Phase 6 (drafting fix — add the Simulation Note) |
 
 `verify_spec.py --final` is the executable definition of this table. SKILL.md and the script must change together — drift is a defect.
-
-
-| Assertion | Type | Blocking |
-|---|---|---|
-| Spec file written | Existence | Yes |
-| YAML frontmatter parses | Integrity | Yes |
-| Mermaid block parses | Integrity | Yes |
-| All step ID references resolve | Integrity | Yes |
-| Every step has requirement owner | Completeness | Yes |
-| Every step node (non-gate, non-terminal) displays owner annotation | Completeness | Yes |
-| Every decision point has a documented rule | Completeness | Yes |
-| Every input has documented validation | Completeness | Yes |
-| Metrics Map covers all four categories | Completeness | Yes |
-| Every controllable input has ≥1 tracked dimension | Completeness | Yes |
-| Every step references standard performance metrics | Completeness | Yes |
-| Metrics Review Plan names cadence and triggers | Completeness | Yes |
-| Gates have named verification methods | Completeness | Yes |
-| At least one terminal state reachable | Reachability | Yes |
-| Edge case section non-empty | Completeness | Yes |
-| Build Notes section non-empty | Completeness | Yes |
-| qa-agents verification logged | Completeness | Yes |
 
 If a blocking assertion fails, do not present the artifact as complete. Fix and re-verify.
 
@@ -572,7 +561,7 @@ The skill captures its own session telemetry — gate fires, soft fails, qa-agen
 | `qa_finding` | Single confirmed finding from qa-agents | `finding_type`, `severity` (low/medium/critical), `where`, `summary` |
 | `session_complete` | Phase 8 final assertions passed | `outcome` (verified / draft-with-blockers), `total_soft_fails` |
 
-A telemetry consumer (e.g., a `dmaic` review session over many process-design runs) can reconstruct the full session shape: clean runs, hard-failed-then-recovered runs, soft-failed-and-shipped runs, abandoned runs.
+A telemetry consumer (e.g., a `dmaic` review session over many process-design runs) can reconstruct the full session shape: clean runs, hard-failed-then-recovered runs, soft-failed-and-shipped runs, abandoned runs. The `mode` dimension on Phase 4 / Phase 7 events lets a consumer slice further — e.g., compare `inline_simulation` runs against `task_fanout` runs to see if simulation mode produces more late-stage soft fails or weaker qa-agents finding sets.
 
 ---
 

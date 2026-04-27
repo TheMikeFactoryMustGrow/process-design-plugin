@@ -187,10 +187,59 @@ def verify(path: Path, final: bool) -> Result:
         )
 
         record = section(body, "Verification Record") or ""
-        res.check(
-            "qa-agents verification logged",
-            "QA Agents" in record or "qa-agents" in record,
+        record_has_qa = ("QA Agents" in record or "qa-agents" in record) and not re.search(
+            r"<[^>]+findings count[^>]*>", record  # template placeholder still present
         )
+        res.check(
+            "qa-agents verification logged in Verification Record (no placeholder)",
+            record_has_qa,
+        )
+
+        # Tolerate markdown bold/italic/punctuation between the label and the
+        # mode token. The agent often writes `**Phase 4 mode:** inline_simulation`
+        # — the regex must skip past `**` and any whitespace.
+        phase4_mode = re.search(
+            r"Phase 4 mode\b[\s\S]{0,40}?(task_fanout|inline_simulation)\b",
+            record, re.IGNORECASE,
+        )
+        res.check(
+            "Phase 4 mode named in Verification Record (task_fanout | inline_simulation)",
+            phase4_mode is not None,
+            "missing 'Phase 4 mode: ...' line" if not phase4_mode else "",
+        )
+
+        phase7_mode = re.search(
+            r"Phase 7 mode\b[\s\S]{0,40}?(skill_invocation|inline_simulation)\b",
+            record, re.IGNORECASE,
+        )
+        # Also accept the iter-2 format where the simulation note line appears
+        # without an explicit "Phase 7 mode:" prefix — e.g. "Phase 7 simulation note: ..."
+        # implies inline_simulation. The mode is whatever the spec encodes; if
+        # neither pattern is present, fail.
+        if phase7_mode is None and re.search(r"phase 7 simulation note", record, re.IGNORECASE):
+            class _M:  # tiny shim so the rest of the code can read .group(1)
+                def group(self, _): return "inline_simulation"
+            phase7_mode = _M()
+        res.check(
+            "Phase 7 mode named in Verification Record (skill_invocation | inline_simulation)",
+            phase7_mode is not None,
+            "missing 'Phase 7 mode: ...' line (or 'Phase 7 simulation note:' for inline mode)"
+            if not phase7_mode else "",
+        )
+
+        # When Phase 7 ran in inline_simulation mode, the spec MUST carry an
+        # explicit Simulation Note flagging lower confidence at the artifact
+        # level (not just session notes).
+        if phase7_mode and phase7_mode.group(1).lower() == "inline_simulation":
+            sim_note = re.search(
+                r"(adversarial isolation collapsed|simulation note|simulated inline)",
+                record, re.IGNORECASE,
+            )
+            res.check(
+                "Phase 7 inline_simulation: Simulation Note present in Verification Record",
+                sim_note is not None,
+                "Phase 7 ran in inline_simulation mode but no Simulation Note found",
+            )
 
     block = parse_mermaid.extract_mermaid_block(body)
     res.check("Mermaid block present", block is not None)
@@ -265,6 +314,16 @@ def verify(path: Path, final: bool) -> Result:
     inputs_body = section(body, "Inputs") or ""
     parsed_inputs = _parse_inputs(inputs_body)
     declared_inputs = [i["name"] for i in parsed_inputs]
+
+    # If the Inputs section has substantive content but the parser found zero
+    # inputs, that's almost certainly a parser/spec mismatch (alternate bullet
+    # syntax) — we'd rather fail loudly than vacuously pass downstream checks.
+    inputs_has_content = any(line.strip() for line in inputs_body.splitlines())
+    res.check(
+        "Inputs section parses into ≥1 input declaration when non-empty",
+        not inputs_has_content or len(parsed_inputs) >= 1,
+        "Inputs section is non-empty but parser found 0 inputs — check bullet syntax (must be `- **name**: ...` at column 0)",
+    )
     inputs_with_validation = [
         i["name"] for i in parsed_inputs
         if any(re.search(r"^\s*-\s*Validation:", line) for line in i["lines"])

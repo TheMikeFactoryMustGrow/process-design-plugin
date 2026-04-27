@@ -205,10 +205,15 @@ Architectural guidance for the implementer. The build agent decides implementati
 
 ## Verification Record
 
-- QA Agents pattern run: <date, finder findings count, auditor disprovals count, referee net score>
-- Path coverage: <N paths enumerated / M expected>
-- Issues resolved: <count>
-- Issues deferred to Assumptions: <count>
+Replace every placeholder below before promoting `status: verified` — the verifier rejects unfilled angle-bracket placeholders. The Phase 4 / Phase 7 mode lines and (when applicable) the Simulation Note are blocking assertions; they must reflect what actually ran, not aspirational defaults.
+
+- QA Agents pattern run on YYYY-MM-DD — finder findings: N — auditor disprovals: N — referee net: N
+- Phase 4 mode: task_fanout *(or inline_simulation if Task subagents were unavailable)*
+- Phase 7 mode: skill_invocation *(or inline_simulation if qa-agents skill was unreachable)*
+- *(Required only if Phase 7 mode = inline_simulation)* **Simulation Note:** qa-agents skill not reachable; finder/auditor/referee simulated inline. Adversarial isolation collapsed. Treat findings as lower-confidence than a real qa-agents pass; re-run Phase 7 from a runtime with subagent capability before treating the spec as production-grade.
+- Path coverage: N paths enumerated / M expected
+- Issues resolved: N
+- Issues deferred to Assumptions: N
 
 ## Change Log
 
