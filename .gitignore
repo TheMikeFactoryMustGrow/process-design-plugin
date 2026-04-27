@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# Local session telemetry
+process-design-sessions/
+
+# Build output stays committed only when tagged for release
+dist/*.plugin.bak
