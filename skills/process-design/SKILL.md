@@ -387,7 +387,7 @@ Gate1 -->|fail| Retry
 - **Atomic claims.** Every decision rule, edge case, successor, and metric is one verifiable statement.
 - **Explicit successors.** Every step names possible next steps with testable conditions.
 - **Metrics referenced, not restated.** The procedure references "standard performance metrics" and named additions; full definitions live in the Metrics Map.
-- **No verifier-workaround commentary in the spec body.** If a `verify_spec.py` check appears to fail for a regex/parsing quirk rather than a real design defect, do **not** reshape the spec to dodge the bug. The spec is the build artifact; workaround commentary corrupts it. Instead: surface the script defect to the user, log it to `session-notes.md`, and either fix the script before continuing, or treat the false fail as a script defect — but only if the carve-out has been earned. **Verifier-bug carve-out is not a free pass.** To exclude a check failure from the soft-fail accumulator, the agent must record three things in a separate `verifier_bugs.md` alongside session-notes: (a) the exact failing check name and the spec content that triggered it, (b) a concrete repro the user can run (`echo "<spec snippet>" | verify_spec.py /dev/stdin`) that demonstrates the script bug, and (c) a description of the input the script *would* have passed if not buggy. Without all three, the failure counts as a regular soft fail and contributes to the threshold-3 accumulator. The carve-out exists to keep script noise out of the user's quality-debt signal — not to give the agent license to dismiss inconvenient design gaps as bugs.
+- **No verifier-workaround commentary in the spec body.** If a `verify_spec.py` check appears to fail for a regex/parsing quirk rather than a real design defect, do **not** reshape the spec to dodge the bug. The spec is the build artifact; workaround commentary corrupts it. Instead: **surface the script defect to the user immediately** with a one-line description and the failing check, log it to `session-notes.md`, and either (a) fix the script before continuing the session, or (b) treat the failure as a regular soft fail (counted toward the threshold-3 accumulator). There is no carve-out — the agent cannot self-classify a failure as "script bug" to dodge accountability. If verifier noise is genuinely producing many soft fails in a session, the user surfacing at threshold-3 is the right moment to triage which are real design gaps and which are script bugs needing patch.
 
 ### Gate 6 (Draft Complete — deterministic layer)
 
@@ -463,7 +463,9 @@ After a fix, always re-run Gate 6 (structural layer must re-pass on any draft mu
 
 ### When findings are false positives
 
-Auditor disproved → no spec change. Note the finding for skill improvement (optional: log to telemetry). When the referee disagrees with both finder and auditor, surface to the user — judgment call needed.
+In `skill_invocation` mode: Auditor disproved → no spec change. Note the finding for skill improvement (optional: log to telemetry). When the referee disagrees with both finder and auditor, surface to the user — judgment call needed.
+
+In `inline_simulation` mode: Auditor disprovals are **advisory** (because adversarial isolation collapsed). No spec change happens automatically, but the finding *is* surfaced to the user as borderline at the end of Phase 7 with the note "Inline-simulation Auditor disproved this — please confirm before treating as a false positive." The user, not the inline simulator, has the last word.
 
 ### Promotion
 
@@ -524,7 +526,7 @@ Run by `verify_spec.py --final` after Phase 7 has promoted the spec to `status: 
 | Metrics Review Plan names cadence and triggers | Yes | Phase 2 (extends to Review Plan) |
 | Every Gate names a verification Method | Yes | Phase 5 |
 | At least one terminal state reachable | Yes | Phase 6 + Gate 6 escape (structural layer should have caught — patch `verify_spec.py`) |
-| No unreachable non-terminal nodes | Yes | Phase 6 (drafting fix) |
+| No unreachable nodes | Yes | Phase 6 (drafting fix) |
 | No unbounded loops | Yes | Phase 6 (drafting fix) — add an exit edge |
 | Edge Case section non-empty with content (not just placeholder rows) | Yes | Phase 4 |
 | Build Notes section non-empty | Yes | Phase 6 (drafting fix) |

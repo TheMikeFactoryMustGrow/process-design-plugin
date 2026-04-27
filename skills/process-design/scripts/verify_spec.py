@@ -191,7 +191,10 @@ def verify(path: Path, final: bool) -> Result:
         # instructions live inside `<!-- ... -->` blocks; placeholders inside
         # those don't count as unfilled.
         record_visible = re.sub(r"<!--[\s\S]*?-->", "", record)
-        unfilled_placeholders = re.findall(r"<[A-Z_][A-Z0-9_]*>", record_visible)
+        # Reject ANY <...> placeholder, not just ALL_CAPS_UNDERSCORE — the
+        # template ships <YYYY-MM-DD> and other lowercase tokens that an
+        # unfilled draft would leak through.
+        unfilled_placeholders = re.findall(r"<[^>\n]+>", record_visible)
         record_has_qa = ("QA Agents" in record_visible or "qa-agents" in record_visible) \
             and not unfilled_placeholders
         res.check(
@@ -209,23 +212,25 @@ def verify(path: Path, final: bool) -> Result:
         # We deliberately do NOT match across newlines — instructional commentary
         # in adjacent bullets must not be picked up as the mode.
         def _find_mode_line(record_text: str, label: str, allowed: list[str]) -> str | None:
-            line_re = re.compile(rf"^[^\n]*{re.escape(label)}[^\n]*$", re.MULTILINE | re.IGNORECASE)
+            """Find the canonical mode declaration.
+
+            Strict shape: a top-level bullet that starts with `- ` (optionally
+            with markdown bold), contains the label, and a single mode token.
+            This deliberately ignores prose mentions, Simulation-Note copy,
+            and reviewer commentary — only the canonical declaration counts.
+            """
+            line_re = re.compile(
+                rf"^-\s+(?:\*\*)?{re.escape(label)}(?:\*\*)?\s*:\s*[^\n]*$",
+                re.MULTILINE | re.IGNORECASE,
+            )
+            candidates = []
             for line in line_re.findall(record_text):
-                # skip lines inside the template's HTML comments (we already
-                # stripped them above for placeholder detection, but the raw
-                # `record` is searched here intentionally — instructional copy
-                # in plain prose can still mention modes).
-                # heuristic: a mode-line bullet begins with `-` and contains
-                # the label early. we use the line as-is and look for tokens.
-                tokens = []
-                for tok in allowed:
-                    if re.search(rf"\b{re.escape(tok)}\b", line):
-                        tokens.append(tok)
-                # exactly one mode declared → unambiguous; multiple → ambiguous
-                # (the template's "task_fanout (or inline_simulation if ...)"
-                # scaffolding is the canonical multi-token line).
+                tokens = [tok for tok in allowed if re.search(rf"\b{re.escape(tok)}\b", line)]
                 if len(tokens) == 1:
-                    return tokens[0]
+                    candidates.append(tokens[0])
+            if len(candidates) == 1:
+                return candidates[0]
+            # 0 or multiple unambiguous canonical lines → caller treats as fail
             return None
 
         phase4_choice = _find_mode_line(record_visible, "Phase 4 mode", ["task_fanout", "inline_simulation"])
@@ -328,6 +333,9 @@ def verify(path: Path, final: bool) -> Result:
 
     inputs_body = section(body, "Inputs") or ""
     parsed_inputs = _parse_inputs(inputs_body)
+    # Reject placeholder input names like `<input_name>` so an unfilled
+    # template doesn't pass the validation/controllable checks vacuously.
+    parsed_inputs = [i for i in parsed_inputs if not re.match(r"^<[^>]+>$", i["name"].strip())]
     declared_inputs = [i["name"] for i in parsed_inputs]
 
     # If the Inputs section has substantive content but the parser found zero
@@ -368,11 +376,14 @@ def verify(path: Path, final: bool) -> Result:
     ]
     gate_rows = [r for r in gate_rows if r.count("|") >= 6]  # 6 columns + leading/trailing pipes = 7 |s
     methods_named = []
+    template_method_placeholders = {
+        "script / agent / human", "<method>", "method", "tbd", "tbd",
+    }
     for row in gate_rows:
         cols = [c.strip() for c in row.strip("|").split("|")]
         if len(cols) >= 4:
-            method = cols[3]
-            if method and not method.startswith("<"):
+            method = cols[3].lower()
+            if method and not method.startswith("<") and method not in template_method_placeholders:
                 methods_named.append(row)
     res.check(
         "Every Gate row names a verification Method",
@@ -405,16 +416,20 @@ def verify(path: Path, final: bool) -> Result:
             f"missing dimensions for: {unmetricked}" if unmetricked else "",
         )
 
-    # Match either `standard performance` or the abbreviated `standard set`,
-    # case-insensitive — the SKILL.md uses both interchangeably as canonical
-    # ways of referencing the per-step performance metrics block.
+    # Per-step coverage: each numbered step's block must mention the standard
+    # performance metrics block. (A spec where step 1 mentions it five times
+    # and steps 2–5 don't mention it at all should NOT pass this gate, even
+    # though the total count >= len(step_ids).)
     standard_metrics_pattern = re.compile(r"\bstandard\s+(performance|set)\b", re.IGNORECASE)
-    standard_metrics_refs = len(standard_metrics_pattern.findall(procedure))
+    step_blocks = re.split(r"^(?=\d+\.\s+\*\*)", procedure, flags=re.MULTILINE)
+    step_blocks = [b for b in step_blocks if re.match(r"\d+\.\s+\*\*", b)]
+    steps_referencing = sum(
+        1 for block in step_blocks if standard_metrics_pattern.search(block)
+    )
     res.check(
-        "Every step references the standard performance metrics block",
-        len(declared_step_ids) == 0 or standard_metrics_refs >= len(declared_step_ids),
-        f"{standard_metrics_refs} mentions of `standard performance` or `standard set` "
-        f"for {len(declared_step_ids)} steps",
+        "Every step block references the standard performance metrics block",
+        len(step_blocks) == 0 or steps_referencing == len(step_blocks),
+        f"{steps_referencing}/{len(step_blocks)} step blocks reference 'standard performance' or 'standard set'",
     )
 
     return res
