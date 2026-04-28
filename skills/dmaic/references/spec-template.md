@@ -34,49 +34,70 @@ related:
 
 ## Measure
 
-> Pick 2–3 terminal metrics. More is noise.
+> Three categories. Outputs confirm; inputs are the levers; external inputs bound what the levers can do. Cap **outputs** at 2–3 (more is noise). Controllable + external inputs scale with the process — name as many as actually drive the outputs.
 
-### Metric 1: [Name]
-- **Definition:** [How it's calculated, including units]
+### Output Metrics (terminal — confirm success)
+
+#### Metric 1: [Name]
+- **Definition:** [How it's calculated, including units (%, ms, $, count, etc.)]
 - **Collection:** [How and how often]
-- **Baseline:** [Current value, or "unknown — establish by [date]"]
+- **Baseline:** [Current value, or "unknown — establish by YYYY-MM-DD"]
 - **Target:** [Where it needs to land]
 
-### Metric 2: [Name]
+#### Metric 2: [Name]
 - **Definition:**
 - **Collection:**
 - **Baseline:**
 - **Target:**
 
-### Metric 3: [Name] *(optional)*
+### Controllable Input Metrics (the levers — owner can move these)
+
+#### Metric C1: [Name]
+- **Definition:** [How it's calculated, including units]
+- **Collection:**
+- **Baseline:**
+- **Target:**
+
+#### Metric C2: [Name]
 - **Definition:**
 - **Collection:**
 - **Baseline:**
 - **Target:**
+
+### External Input Metrics (context — affect output, can't be moved)
+
+#### Metric E1: [Name]
+- **Definition:** [How it's calculated, including units]
+- **Collection:**
+- **Baseline:**
+- **Target:** _N/A — track only_
 
 ---
 
 ## Analyze
 
-For each metric, define what to do when it goes bad.
+### Causal Chain (which inputs drive which outputs)
 
-### [Metric 1 Name]
-- **Threshold:** [Green / Yellow / Red bands or trigger value]
-- **Known failure modes:**
-  1. [Cause]
-  2. [Cause]
-  3. [Cause]
-- **First action when it trips:** [Concrete step + who runs it]
+For each output metric, name the controllable input(s) that move it. **If an output has no controllable input listed, the spec is incomplete — go back to Measure.** External inputs go in the third column to bound what the levers can plausibly do.
 
-### [Metric 2 Name]
-- **Threshold:**
-- **Known failure modes:**
-- **First action:**
+| Output Metric | Controllable Inputs | External Inputs (bounds) |
+|---|---|---|
+| [Output Metric 1] | [Controllable Input(s) — comma-separated] | [External Inputs that bound the relationship] |
+| [Output Metric 2] | [Controllable Input(s)] | [External Inputs] |
 
-### [Metric 3 Name]
-- **Threshold:**
+### Per-output thresholds and playbooks
+
+#### [Output Metric 1]
+- **Threshold (red / yellow / green):** [e.g. red ≤ baseline, yellow ≤ midpoint, green ≥ target]
+- **Known failure modes (3–5):** [named cause 1], [2], [3]
+- **First action when threshold trips:** [action] — owned by [[Person]]
+- **Time-to-resolve target:** [e.g. 24h, 1 week]
+
+#### [Output Metric 2]
+- **Threshold (red / yellow / green):**
 - **Known failure modes:**
-- **First action:**
+- **First action:** owned by [[Person]]
+- **Time-to-resolve target:**
 
 ---
 
@@ -84,14 +105,17 @@ For each metric, define what to do when it goes bad.
 
 > Every improvement attempt is an experiment. Frame it as one.
 
-### Current experiment *(or "None in flight")*
+### Experiment 1 *(or "None in flight")*
 - **Hypothesis:** "We believe [change] will [effect] because [reasoning]."
 - **Test plan:** [What changes, on what scope, for how long]
 - **Success criterion:** [Which metric moves, by how much]
 - **Failure criterion:** [What result triggers a revert]
 - **Owner:** [[Person]]
-- **Start date:**
-- **Decision date:**
+- **Start date:** YYYY-MM-DD
+- **Decision date:** YYYY-MM-DD
+- **Status:** proposed | running | succeeded | failed | reverted
+
+> Add `### Experiment 2`, `### Experiment 3`, etc. as new ones launch. The template supports a portfolio, not a single in-flight experiment.
 
 ---
 
@@ -99,9 +123,21 @@ For each metric, define what to do when it goes bad.
 
 The regression guard. Don't let this section be empty.
 
-- **Monitoring:** [Which metric, watched on what cadence, by whom]
-- **Alert:** [What trips it, where it goes, who responds]
-- **Recurring review:** [When and how often the spec itself gets re-examined]
+### Monitoring
+- **Metric watched:** [which output metric]
+- **Cadence:** [e.g. weekly Monday review, real-time alert]
+- **Watcher:** [[Person]]
+
+### Alert
+- **Trigger:** [threshold or condition]
+- **Destination:** [Slack channel, pager, email]
+- **Responder:** [[Person]]
+- **Response SLA:** [e.g. 24 hours]
+
+### Recurring spec review
+- **Cadence:** [e.g. quarterly]
+- **Reviewer:** [[Person]]
+- **Trigger conditions for off-cycle review:** [e.g. output drift > 20%, 3 alerts in a week]
 
 ---
 

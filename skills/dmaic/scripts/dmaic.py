@@ -2,23 +2,26 @@
 """
 DMAIC orchestrator helper script.
 
-Three subcommands:
+Subcommands:
 
-  detect-vault   Walk up from --cwd and figure out whether we're in an
-                 Obsidian vault, a Linglepedia vault, or no vault at all.
-                 Returns JSON describing the vault root and known folders.
+  detect-vault         Walk up from --cwd; identify Obsidian / Linglepedia / none.
+  prefill              Emit a JSON skeleton with required keys + sensible
+                       defaults; agent fills phase blocks.
+  scaffold             Emit a markdown template for one phase (measure,
+                       analyze, improve, control, define) with the right
+                       number of metric / experiment slots. Replaces the
+                       per-phase SKILL.md output-format prose.
+  compose              Assemble a spec.json into a complete DMAIC spec .md.
+                       Refuses to overwrite existing files unless --force.
+  validate             Schema-check an existing spec; --strict-metrics adds
+                       structural checks on metric units / baselines /
+                       targets; --strict exits non-zero on any failure.
+  check-causal-chain   Verify the Analyze section names ≥1 controllable
+                       input per output metric — the headline G4 check.
+  validate-owner       Reject department-shaped owner names ("the team",
+                       "operations") that defeat individual accountability.
 
-  compose        Take a spec.json with frontmatter fields and the five
-                 phase blocks, and write a complete DMAIC spec markdown
-                 file. Eliminates string-assembly drift between runs.
-
-  validate       Read a DMAIC spec markdown file and check it against the
-                 schema (frontmatter complete, all five sections, 2–3
-                 metrics, Control non-empty, etc.). Returns JSON with
-                 per-check pass/fail and exits non-zero on hard failures.
-
-Designed to be invoked by the dmaic skill's SKILL.md. Self-contained — no
-third-party dependencies. Works on any Python 3.8+.
+Self-contained — no third-party dependencies. Python 3.8+.
 """
 
 from __future__ import annotations
@@ -116,11 +119,13 @@ def compose_spec(spec: dict[str, Any]) -> str:
     today = date.today().isoformat()
     process = spec["process"]
     owner = spec["owner"]
-    if not (owner.startswith("[[") and owner.endswith("]]")):
-        # Wrap bare owner in wikilink for vault consistency.
-        owner_yaml = f'"[[{owner}]]"'
-    else:
+    # Wrap bare owner in wikilink for vault consistency. Detect any existing
+    # `[[...]]` occurrence — not just whole-string match — so values like
+    # "[[Mike]] (interim)" don't get wrapped a second time.
+    if "[[" in owner and "]]" in owner:
         owner_yaml = f'"{owner}"'
+    else:
+        owner_yaml = f'"[[{owner}]]"'
 
     tags = list(spec["tags"])
     if "dmaic" not in tags:
@@ -280,16 +285,22 @@ def validate_spec(spec_text: str) -> dict[str, Any]:
         add("measure_has_2_or_3_metrics", 2 <= n <= 3,
             f"found {n} metric subheadings: {sub}")
 
-        # Each metric has the four required fields
+        # Each metric has the four required fields, AND each field has a
+        # non-empty value (not just the label). The lazy `.+?` after the colon
+        # rejects `**Definition:**` followed by nothing on the same line.
         chunks = re.split(r"^###+\s+", measure, flags=re.MULTILINE)[1:]
         bad: list[str] = []
         for c in chunks:
             first = c.split("\n", 1)[0]
             for field in ["Definition", "Collection", "Baseline", "Target"]:
-                if not re.search(rf"\*\*{field}\b|^\s*{field}\s*:",
-                                  c, re.MULTILINE | re.IGNORECASE):
-                    bad.append(f"'{first.strip()}' missing {field}")
-        add("each_metric_has_required_fields", not bad,
+                # Match either `**Field:**  value...` or `Field: value...`,
+                # requiring at least one non-whitespace character after the colon.
+                if not re.search(
+                    rf"(?:\*\*{field}\*\*|^\s*{field})\s*:\s*\S",
+                    c, re.MULTILINE | re.IGNORECASE,
+                ):
+                    bad.append(f"'{first.strip()}' missing or empty {field}")
+        add("each_metric_has_required_fields_with_content", not bad,
             "ok" if not bad else "; ".join(bad))
 
     # Control has monitoring + recurring review
@@ -323,6 +334,283 @@ def validate_spec(spec_text: str) -> dict[str, Any]:
 
 
 # -----------------------------------------------------------------------------
+# strict-metrics structural checks
+# -----------------------------------------------------------------------------
+
+# A metric Definition should mention units. We accept any unit-shaped token
+# (currency, percent, time, count words). This is a heuristic; the agent gets
+# to override with --strict-metrics-skip.
+_UNIT_TOKENS = re.compile(
+    r"(?:%|\$|€|£|¥|\bbps\b|\bms\b|\bsec(?:onds?)?\b|\bmin(?:utes?)?\b|"
+    r"\bhours?\b|\bdays?\b|\bweeks?\b|\bmonths?\b|\bper\b|\bcount\b|"
+    r"\bratio\b|\brate\b|\bscore\b|\busers?\b|\brequests?\b|\bevents?\b|"
+    r"\bdollars?\b|\b\d+(?:\.\d+)?\s*(?:k|m|b|x)\b)",
+    re.IGNORECASE,
+)
+
+# Baseline / Target values. Numeric, percent, currency, or the explicit
+# "unknown — establish by ..." escape hatch the SKILL.md defines.
+_VALUE_TOKEN = re.compile(
+    r"(\d+(?:\.\d+)?\s*%?|\$\d+|\bunknown\b\s*[—–-]\s*establish\b)",
+    re.IGNORECASE,
+)
+
+
+def strict_metric_checks(measure_text: str) -> list[dict[str, Any]]:
+    """Per-metric structural checks beyond presence: each Definition mentions
+    units; each Baseline + Target is a value or the "unknown — establish" escape.
+    Returns a list of failure entries (empty == all good)."""
+    failures: list[dict[str, Any]] = []
+    chunks = re.split(r"^###+\s+", measure_text, flags=re.MULTILINE)[1:]
+    for c in chunks:
+        first = c.split("\n", 1)[0].strip()
+        # Definition has units?
+        def_match = re.search(r"\*\*Definition\*\*\s*:?\s*([^\n]+)", c, re.IGNORECASE)
+        if def_match and not _UNIT_TOKENS.search(def_match.group(1)):
+            failures.append({"metric": first, "check": "definition_has_units",
+                             "evidence": def_match.group(1).strip()[:80]})
+        # Baseline shape
+        base_match = re.search(r"\*\*Baseline\*\*\s*:?\s*([^\n]+)", c, re.IGNORECASE)
+        if base_match and not _VALUE_TOKEN.search(base_match.group(1)):
+            failures.append({"metric": first, "check": "baseline_value_shape",
+                             "evidence": base_match.group(1).strip()[:80]})
+        # Target shape
+        targ_match = re.search(r"\*\*Target\*\*\s*:?\s*([^\n]+)", c, re.IGNORECASE)
+        if targ_match and not _VALUE_TOKEN.search(targ_match.group(1)):
+            failures.append({"metric": first, "check": "target_value_shape",
+                             "evidence": targ_match.group(1).strip()[:80]})
+    return failures
+
+
+# -----------------------------------------------------------------------------
+# prefill — emit a starter spec.json skeleton
+# -----------------------------------------------------------------------------
+
+def prefill_spec(process: str, owner: str, tags: list[str],
+                 summary: str = "", related_extra: list[str] | None = None) -> dict[str, Any]:
+    """Return a fully-formed spec.json dict the agent only needs to fill
+    phase-block content into."""
+    today = date.today().isoformat()
+    return {
+        "process": process,
+        "owner": owner,
+        "status": "draft",
+        "tags": tags,
+        "summary": summary,
+        "related_extra": related_extra or [],
+        "created": today,
+        "last_reviewed": today,
+        "truth_score": DEFAULT_TRUTH_SCORE,
+        "define_block": "",
+        "measure_block": "",
+        "analyze_block": "",
+        "improve_block": "",
+        "control_block": "",
+        "notes_block": "",
+    }
+
+
+# -----------------------------------------------------------------------------
+# scaffold — emit per-phase markdown templates
+# -----------------------------------------------------------------------------
+
+_DEFINE_SCAFFOLD = """\
+**What this process is supposed to do:** <one sentence, no jargon>
+
+**What success looks like:** <concrete, observable end state>
+
+**What failure looks like:** <equally concrete; absence of success>
+"""
+
+_MEASURE_SCAFFOLD_TEMPLATE = """\
+### Output Metrics (terminal — confirm success)
+
+{output_blocks}
+
+### Controllable Input Metrics (the levers — owner can move these)
+
+{controllable_blocks}
+
+### External Input Metrics (context — affect output, can't be moved)
+
+{external_blocks}
+"""
+
+_METRIC_BLOCK = """\
+#### Metric {n}: <name>
+- **Definition:** <how it's calculated, with units (%, ms, $, count, etc.)>
+- **Collection:** <how + how often gathered; manual or automated>
+- **Baseline:** <current value, OR `unknown — establish by YYYY-MM-DD`>
+- **Target:** <where it needs to land>
+"""
+
+_ANALYZE_SCAFFOLD_TEMPLATE = """\
+### Causal Chain (which inputs drive which outputs)
+
+For each output metric, name the controllable input(s) that move it. If an
+output has no controllable input, the spec is incomplete — go back to Measure
+and add the missing lever.
+
+{causal_rows}
+
+### Per-output thresholds and playbooks
+
+{output_analyze_blocks}
+"""
+
+_CAUSAL_ROW = "| <Output Metric {n}> | <Controllable Input(s) — comma-separated> | <External Inputs that bound the relationship> |"
+
+_OUTPUT_ANALYZE_BLOCK = """\
+#### <Output Metric {n}>
+- **Threshold (red / yellow / green):** <e.g. red ≤ baseline, yellow ≤ midpoint, green ≥ target>
+- **Known failure modes (3–5):** <named cause 1>, <2>, <3>
+- **First action when threshold trips:** <action> — owned by <[[Person]]>
+- **Time-to-resolve target:** <e.g. 24h, 1 week>
+"""
+
+_IMPROVE_SCAFFOLD_TEMPLATE = """\
+{experiment_blocks}
+"""
+
+_EXPERIMENT_BLOCK = """\
+### Experiment {n}
+- **Hypothesis:** We believe <change> will <effect> because <reasoning>.
+- **Test plan:** <what changes, on what scope, for how long>
+- **Success criterion:** <which metric moves, by how much>
+- **Failure criterion:** <result that triggers revert>
+- **Owner:** <[[Person]]>
+- **Decision date:** <YYYY-MM-DD>
+- **Status:** proposed | running | succeeded | failed | reverted
+"""
+
+_CONTROL_SCAFFOLD = """\
+### Monitoring
+- **Metric watched:** <which output metric>
+- **Cadence:** <e.g. weekly Monday review, real-time alert>
+- **Watcher:** <[[Person]]>
+
+### Alert
+- **Trigger:** <threshold or condition>
+- **Destination:** <Slack channel, pager, email>
+- **Responder:** <[[Person]]>
+- **Response SLA:** <e.g. 24 hours>
+
+### Recurring spec review
+- **Cadence:** <e.g. quarterly>
+- **Reviewer:** <[[Person]]>
+- **Trigger conditions for off-cycle review:** <e.g. output drift > 20%, 3 alerts in a week>
+"""
+
+
+def scaffold_phase(phase: str, metrics: int = 3, experiments: int = 1) -> str:
+    """Return a markdown scaffold for the named phase. The agent fills in the
+    angle-bracket placeholders.
+
+    metrics applies to Measure (output count) and Analyze (causal-row count
+    and threshold-block count). experiments applies to Improve."""
+    if phase == "define":
+        return _DEFINE_SCAFFOLD
+    if phase == "measure":
+        output_blocks = "\n".join(_METRIC_BLOCK.format(n=i+1) for i in range(metrics))
+        controllable = "\n".join(_METRIC_BLOCK.format(n=f"C{i+1}") for i in range(metrics))
+        external = "\n".join(_METRIC_BLOCK.format(n=f"E{i+1}") for i in range(max(1, metrics-1)))
+        return _MEASURE_SCAFFOLD_TEMPLATE.format(
+            output_blocks=output_blocks,
+            controllable_blocks=controllable,
+            external_blocks=external,
+        )
+    if phase == "analyze":
+        causal = "\n".join(_CAUSAL_ROW.format(n=i+1) for i in range(metrics))
+        causal_table = (
+            "| Output Metric | Controllable Inputs | External Inputs (bounds) |\n"
+            "|---|---|---|\n" + causal
+        )
+        analyze_blocks = "\n".join(_OUTPUT_ANALYZE_BLOCK.format(n=i+1) for i in range(metrics))
+        return _ANALYZE_SCAFFOLD_TEMPLATE.format(
+            causal_rows=causal_table,
+            output_analyze_blocks=analyze_blocks,
+        )
+    if phase == "improve":
+        if experiments < 1:
+            return "_No experiments in flight yet. Add as they're proposed._\n"
+        return "\n".join(_EXPERIMENT_BLOCK.format(n=i+1) for i in range(experiments))
+    if phase == "control":
+        return _CONTROL_SCAFFOLD
+    raise ValueError(f"unknown phase: {phase!r}")
+
+
+# -----------------------------------------------------------------------------
+# check-causal-chain — every Output Metric named in Analyze must trace to ≥1
+# Controllable Input. Headline G4 enforcement.
+# -----------------------------------------------------------------------------
+
+def check_causal_chain(spec_text: str) -> dict[str, Any]:
+    """Inspect the Analyze section's causal-chain table; verify every output
+    metric has at least one controllable input listed.
+
+    Returns {"all_outputs_traced": bool, "missing": [...], "table_found": bool}.
+    """
+    analyze = _section(spec_text, "Analyze") or ""
+    # Look for the Markdown table whose header mentions "Output Metric" and
+    # "Controllable Input" in the header row.
+    table_match = re.search(
+        r"(\|[^\n]*Output Metric[^\n]*Controllable Input[^\n]*\|)\s*\n"
+        r"\|[\s\-:|]+\|\s*\n"
+        r"((?:\|[^\n]*\|\s*\n?)+)",
+        analyze, re.IGNORECASE,
+    )
+    if not table_match:
+        return {
+            "all_outputs_traced": False,
+            "missing": [],
+            "table_found": False,
+            "evidence": "no causal-chain table found in Analyze (expected header row with 'Output Metric' and 'Controllable Input' columns)",
+        }
+    rows = [r.strip() for r in table_match.group(2).splitlines() if r.strip().startswith("|")]
+    missing: list[str] = []
+    for row in rows:
+        cells = [c.strip() for c in row.strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        output_name, controllable = cells[0], cells[1]
+        # Skip placeholder rows
+        if output_name.startswith("<") and output_name.endswith(">"):
+            continue
+        if not controllable or controllable.startswith("<") or controllable.lower() in ("none", "n/a"):
+            missing.append(output_name)
+    return {
+        "all_outputs_traced": not missing,
+        "missing": missing,
+        "table_found": True,
+        "rows_checked": len(rows),
+    }
+
+
+# -----------------------------------------------------------------------------
+# validate-owner — reject department-shaped names
+# -----------------------------------------------------------------------------
+
+_DEPARTMENT_DENYLIST = {
+    "the team", "team", "operations", "ops", "marketing", "engineering",
+    "product", "design", "leadership", "management", "everyone", "all hands",
+    "tbd", "tba", "various", "n/a",
+}
+
+
+def validate_owner(owner: str) -> dict[str, Any]:
+    """Reject department-shaped owners. People are accountable; departments
+    aren't. Returns {"ok": bool, "reason": str}."""
+    bare = owner.replace("[[", "").replace("]]", "").strip().lower()
+    # Strip parenthetical role qualifiers like "[[Mike]] (interim)".
+    bare = re.sub(r"\([^)]*\)", "", bare).strip()
+    if not bare:
+        return {"ok": False, "reason": "owner is empty"}
+    if bare in _DEPARTMENT_DENYLIST:
+        return {"ok": False, "reason": f"'{owner}' is a department, not a person — name a specific accountable individual"}
+    return {"ok": True, "reason": "ok"}
+
+
+# -----------------------------------------------------------------------------
 # CLI
 # -----------------------------------------------------------------------------
 
@@ -342,12 +630,46 @@ def main() -> int:
                        help="Path to write the resulting .md file")
     p_co.add_argument("--validate-after", action="store_true",
                        help="Also run validate on the composed file")
+    p_co.add_argument("--force", action="store_true",
+                       help="Overwrite the output file if it already exists")
 
     p_va = sub.add_parser("validate",
                           help="Validate a DMAIC spec markdown file")
     p_va.add_argument("--file", required=True, help="Path to the spec .md")
     p_va.add_argument("--strict", action="store_true",
                        help="Exit 1 if any check fails")
+    p_va.add_argument("--strict-metrics", action="store_true",
+                       help="Also run structural checks on metric units, "
+                            "baseline shapes, target shapes")
+
+    p_pf = sub.add_parser("prefill",
+                          help="Emit a JSON skeleton with required keys filled in")
+    p_pf.add_argument("--process", required=True, help="Process name (human-readable)")
+    p_pf.add_argument("--owner", required=True, help="Owner — bare name or [[Wikilink]]")
+    p_pf.add_argument("--tags", default="", help="Comma-separated tags (dmaic auto-added)")
+    p_pf.add_argument("--summary", default="", help="One-sentence summary")
+    p_pf.add_argument("--related-extra", default="",
+                       help="Comma-separated extra wikilink targets")
+
+    p_sc = sub.add_parser("scaffold",
+                          help="Emit a markdown template for one phase")
+    p_sc.add_argument("--phase", required=True,
+                       choices=["define", "measure", "analyze", "improve", "control"])
+    p_sc.add_argument("--metrics", type=int, default=3,
+                       help="Number of output metric blocks (default 3; "
+                            "controllable + external scale with this)")
+    p_sc.add_argument("--experiments", type=int, default=1,
+                       help="Number of experiment blocks for --phase improve")
+
+    p_cc = sub.add_parser("check-causal-chain",
+                          help="Verify every output metric in Analyze has ≥1 controllable input")
+    p_cc.add_argument("--file", required=True, help="Path to the spec .md")
+    p_cc.add_argument("--strict", action="store_true",
+                       help="Exit 1 if any output is missing a controllable input")
+
+    p_vo = sub.add_parser("validate-owner",
+                          help="Reject department-shaped owner names")
+    p_vo.add_argument("--owner", required=True, help="Owner string to validate")
 
     args = parser.parse_args()
 
@@ -359,7 +681,15 @@ def main() -> int:
     if args.cmd == "compose":
         spec = json.loads(Path(args.input).read_text())
         md = compose_spec(spec)
-        Path(args.output).write_text(md)
+        out_path = Path(args.output)
+        if out_path.exists() and not args.force:
+            print(json.dumps({
+                "error": "output file already exists",
+                "path": str(out_path),
+                "hint": "pass --force to overwrite, or pick a different --output",
+            }, indent=2), file=sys.stderr)
+            return 1
+        out_path.write_text(md)
         print(json.dumps({
             "wrote": args.output,
             "bytes": len(md),
@@ -374,10 +704,45 @@ def main() -> int:
     if args.cmd == "validate":
         text = Path(args.file).read_text()
         result = validate_spec(text)
+        if args.strict_metrics:
+            measure = _section(text, "Measure") or ""
+            metric_failures = strict_metric_checks(measure)
+            result["strict_metric_failures"] = metric_failures
+            result["strict_metrics_pass"] = not metric_failures
+            if metric_failures:
+                result["all_passed"] = False
+                result["failed"] += len(metric_failures)
+                result["total"] += len(metric_failures)
         print(json.dumps(result, indent=2))
         if args.strict and not result["all_passed"]:
             return 1
         return 0
+
+    if args.cmd == "prefill":
+        tags = [t.strip() for t in args.tags.split(",") if t.strip()]
+        related = [r.strip() for r in args.related_extra.split(",") if r.strip()]
+        skel = prefill_spec(args.process, args.owner, tags,
+                             summary=args.summary, related_extra=related)
+        print(json.dumps(skel, indent=2))
+        return 0
+
+    if args.cmd == "scaffold":
+        print(scaffold_phase(args.phase, metrics=args.metrics,
+                              experiments=args.experiments))
+        return 0
+
+    if args.cmd == "check-causal-chain":
+        text = Path(args.file).read_text()
+        result = check_causal_chain(text)
+        print(json.dumps(result, indent=2))
+        if args.strict and not result["all_outputs_traced"]:
+            return 1
+        return 0
+
+    if args.cmd == "validate-owner":
+        result = validate_owner(args.owner)
+        print(json.dumps(result, indent=2))
+        return 0 if result["ok"] else 1
 
     return 1
 
