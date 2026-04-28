@@ -15,9 +15,33 @@ These three are designed to compose. A spec produced by `process-design` is veri
 
 ## Install
 
-1. Build: `./build.sh` produces `dist/process-design.plugin`.
-2. Drop the file into Cowork's plugin manager.
-3. Restart your session.
+### Claude Code (recommended for most colleagues)
+
+```bash
+# 1. Add this repo as a marketplace
+/plugin marketplace add TheMikeFactoryMustGrow/process-design-plugin
+
+# 2. Install the plugin from the marketplace
+/plugin install process-design@process-design-plugin
+```
+
+That's it. All 8 skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`.
+
+### Cowork (drag-and-drop)
+
+1. Download [`dist/process-design.plugin`](dist/process-design.plugin) (or build it locally with `./build.sh`)
+2. Drop the file onto Cowork's plugin manager
+3. Click Install, restart your session
+
+### Local development install
+
+If you want to hack on the plugin in place:
+
+```bash
+git clone git@github.com:TheMikeFactoryMustGrow/process-design-plugin.git ~/Documents/Linglepedia/_claude_config/process-design
+```
+
+Cowork will scan `_claude_config/` and find the plugin manifest at `plugins/process-design/.claude-plugin/plugin.json`.
 
 ## Use
 
@@ -34,7 +58,7 @@ The supports trigger on their own phrases — `qa-agents` on "QA this", "stress 
 
 ## What `process-design` produces
 
-A single markdown file conforming to `skills/process-design/templates/process-spec-template.md`:
+A single markdown file conforming to `plugins/process-design/skills/process-design/templates/process-spec-template.md`:
 
 - YAML frontmatter (`status: draft` mid-session, `verified` after Phase 7 passes)
 - Output / Inputs / Preconditions
@@ -51,7 +75,7 @@ A single markdown file conforming to `skills/process-design/templates/process-sp
 
 ## Helper scripts
 
-`skills/process-design/scripts/`:
+`plugins/process-design/skills/process-design/scripts/`:
 
 - `verify_spec.py <path>` — runs the deterministic portion of the verification suite (Gate 6); add `--final` for the Phase 8 blocking-assertion set.
 - `parse_mermaid.py <path>` — extracts and parses the Mermaid block; reports nodes, edges, and reachable terminals.
@@ -62,6 +86,30 @@ All stdlib Python 3.
 ## Telemetry
 
 `process-design` writes session telemetry to `$PROCESS_DESIGN_LOG_DIR/<date>-<process-slug>.jsonl`, defaulting to `~/.claude/process-design-sessions/`. Best-effort — if the destination is unreachable, the skill completes anyway with a degraded-mode warning. Output correctness does not depend on telemetry working.
+
+## Repository layout
+
+```
+process-design-plugin/                       (this repo, also the Claude Code marketplace)
+├── .claude-plugin/marketplace.json          ← marketplace manifest (Claude Code reads this)
+├── plugins/
+│   └── process-design/                      ← plugin source
+│       ├── .claude-plugin/plugin.json       ← plugin manifest (Cowork reads this)
+│       └── skills/                          ← 8 skills
+│           ├── process-design/              ← headliner
+│           ├── qa-agents/                   ← bundled adversarial review
+│           ├── dmaic/                       ← bundled Six Sigma orchestrator
+│           ├── dmaic-define/
+│           ├── dmaic-measure/
+│           ├── dmaic-analyze/
+│           ├── dmaic-improve/
+│           └── dmaic-control/
+├── dist/process-design.plugin               ← prebuilt zip for Cowork drag-and-drop
+├── workspaces/                              ← dev artifacts (eval runs, qa-agents reviews)
+├── build.sh                                 ← rebuild dist/process-design.plugin
+├── README.md
+└── LICENSE
+```
 
 ## License
 

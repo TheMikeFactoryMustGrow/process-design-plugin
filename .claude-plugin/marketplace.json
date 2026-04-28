@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "process-design-plugin",
+  "description": "Process Design with extra benefits — a thought-partner skill that walks you from fuzzy intuition to a build-ready spec, bundled with qa-agents (adversarial review) and dmaic (Define/Measure/Analyze/Improve/Control) for verification and metrics review.",
+  "owner": {
+    "name": "Mike Lingle",
+    "email": "michael.t.lingle@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "process-design",
+      "description": "Eight composable skills for designing processes that build agents can actually execute. The headliner walks you through Working Backwards, metrics design, Elon's algorithm, gap probing, TDD-style verification, drafting, adversarial verification, and build handoff. Sibling skills qa-agents (Finder/Auditor/Referee adversarial review) and dmaic + 5 phase skills (Define/Measure/Analyze/Improve/Control) are independently invokable.",
+      "category": "productivity",
+      "source": "./plugins/process-design",
+      "homepage": "https://github.com/TheMikeFactoryMustGrow/process-design-plugin"
+    }
+  ]
+}
