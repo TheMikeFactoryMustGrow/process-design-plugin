@@ -217,6 +217,88 @@ def compose_spec(spec: dict[str, Any]) -> str:
 # validate
 # -----------------------------------------------------------------------------
 
+def _split_metric_categories(measure_text: str) -> dict[str, list[dict[str, str]]]:
+    """Parse the Measure section into the three category buckets.
+
+    Looks for `### Output Metrics`, `### Controllable Input Metrics`,
+    `### External Input Metrics` H3 headings, and within each, parses
+    `#### Metric N: name` H4 blocks.
+
+    Returns {"output": [...], "controllable": [...], "external": [...]} where
+    each metric is {"name": str, "body": str}.
+
+    Tolerates older flat structure: if no H3 categories are found, every
+    `### Metric N` block is treated as output (legacy fallback).
+    """
+    out: dict[str, list[dict[str, str]]] = {
+        "output": [], "controllable": [], "external": [],
+    }
+    # Split into ### H3 sections.
+    h3_sections = re.split(r"^###\s+", measure_text, flags=re.MULTILINE)
+    if len(h3_sections) <= 1:
+        return out
+    # First chunk is preamble before the first H3; skip it.
+    found_categories = False
+    for chunk in h3_sections[1:]:
+        first_line = chunk.split("\n", 1)[0].strip()
+        body = chunk.split("\n", 1)[1] if "\n" in chunk else ""
+        head_lower = first_line.lower()
+        if "output metric" in head_lower:
+            cat = "output"
+            found_categories = True
+        elif "controllable input metric" in head_lower:
+            cat = "controllable"
+            found_categories = True
+        elif "external input metric" in head_lower:
+            cat = "external"
+            found_categories = True
+        else:
+            # H3 block that isn't a category — treat as legacy flat-list metric.
+            if not found_categories:
+                # legacy: every H3 block is an output
+                out["output"].append({"name": first_line, "body": body})
+            continue
+        # Within this category, find #### Metric blocks.
+        h4_blocks = re.split(r"^####\s+", body, flags=re.MULTILINE)
+        for h4 in h4_blocks[1:]:
+            metric_first = h4.split("\n", 1)[0].strip()
+            metric_body = h4.split("\n", 1)[1] if "\n" in h4 else ""
+            out[cat].append({"name": metric_first, "body": metric_body})
+    return out
+
+
+def _metric_field_has_value(metric_body: str, field: str, allow_na: bool) -> bool:
+    """Check that a metric body has `Field:` followed by a non-placeholder value.
+
+    Accepts both `**Field:**` (canonical, template form) and `**Field**:` and
+    bare `Field:` shapes. The post-colon value must be non-empty and not a
+    `<placeholder>` or `[placeholder]` token. When allow_na, the literal
+    'N/A' (case-insensitive) is also accepted.
+    """
+    pattern = re.compile(
+        rf"(?:\*\*{field}\*\*\s*:|\*\*{field}:\*\*|^\s*{field}\s*:)\s*(\S[^\n]*)",
+        re.MULTILINE | re.IGNORECASE,
+    )
+    match = pattern.search(metric_body)
+    if not match:
+        return False
+    value = match.group(1).strip()
+    # Strip trailing italic / annotation
+    bare = re.sub(r"_[^_]+_$", "", value).strip()
+    bare = re.sub(r"\*[^*]+\*$", "", bare).strip()
+    # Reject obvious placeholders.
+    if (bare.startswith("<") and bare.endswith(">")) or (bare.startswith("[") and bare.endswith("]")):
+        return False
+    if not bare:
+        return False
+    if allow_na and bare.upper().startswith("N/A"):
+        return True
+    # Reject explicit empty placeholders.
+    if bare.upper() in ("TBD", "TBA", "?"):
+        return False
+    return True
+
+
 def _section(text: str, name: str) -> str | None:
     """Return the body of a top-level section by heading name, or None.
 
@@ -277,29 +359,40 @@ def validate_spec(spec_text: str) -> dict[str, Any]:
         "ok" if _section(spec_text, "Experiments Log") is not None
              else "no '## Experiments Log' section")
 
-    # Measure has 2–3 metrics
+    # Measure: split into the three category sub-sections and validate each
+    # appropriately. 2–3 cap applies to OUTPUT metrics only; controllable +
+    # external have no cap. External metric Targets are N/A.
     measure = _section(spec_text, "Measure")
     if measure:
-        sub = re.findall(r"^###+\s+(.+)$", measure, re.MULTILINE)
-        n = len(sub)
-        add("measure_has_2_or_3_metrics", 2 <= n <= 3,
-            f"found {n} metric subheadings: {sub}")
+        categories = _split_metric_categories(measure)
+        # Output metric count is the only one we cap.
+        outputs = categories["output"]
+        n_outputs = len(outputs)
+        add("measure_has_2_or_3_outputs", 2 <= n_outputs <= 3,
+            f"found {n_outputs} output metrics: {[m['name'] for m in outputs]}")
+        # Controllable inputs: at least 1 expected, no upper bound.
+        controllable = categories["controllable"]
+        add("measure_has_at_least_one_controllable_input",
+            len(controllable) >= 1,
+            f"found {len(controllable)} controllable input metrics")
 
-        # Each metric has the four required fields, AND each field has a
-        # non-empty value (not just the label). The lazy `.+?` after the colon
-        # rejects `**Definition:**` followed by nothing on the same line.
-        chunks = re.split(r"^###+\s+", measure, flags=re.MULTILINE)[1:]
+        # Per-metric content checks — colon-inside-bold form is the canonical
+        # one (the template ships `**Definition:**`).
         bad: list[str] = []
-        for c in chunks:
-            first = c.split("\n", 1)[0]
-            for field in ["Definition", "Collection", "Baseline", "Target"]:
-                # Match either `**Field:**  value...` or `Field: value...`,
-                # requiring at least one non-whitespace character after the colon.
-                if not re.search(
-                    rf"(?:\*\*{field}\*\*|^\s*{field})\s*:\s*\S",
-                    c, re.MULTILINE | re.IGNORECASE,
-                ):
-                    bad.append(f"'{first.strip()}' missing or empty {field}")
+        for category, metrics in categories.items():
+            required = ["Definition", "Collection", "Baseline"]
+            # Targets are required for output + controllable, not external.
+            if category != "external":
+                required.append("Target")
+            for m in metrics:
+                for field in required:
+                    if not _metric_field_has_value(m["body"], field, allow_na=False):
+                        bad.append(f"[{category}] '{m['name']}' missing or empty {field}")
+                # External Targets allowed N/A; verify the field is at least
+                # present even if N/A.
+                if category == "external":
+                    if not _metric_field_has_value(m["body"], "Target", allow_na=True):
+                        bad.append(f"[external] '{m['name']}' missing Target line (N/A is allowed but the line must exist)")
         add("each_metric_has_required_fields_with_content", not bad,
             "ok" if not bad else "; ".join(bad))
 
@@ -358,27 +451,69 @@ _VALUE_TOKEN = re.compile(
 
 def strict_metric_checks(measure_text: str) -> list[dict[str, Any]]:
     """Per-metric structural checks beyond presence: each Definition mentions
-    units; each Baseline + Target is a value or the "unknown — establish" escape.
-    Returns a list of failure entries (empty == all good)."""
+    units; each Baseline is a value or the "unknown — establish" escape; each
+    Target is a value (or `N/A` for external inputs).
+
+    Walks the 3-category structure when present so external metric Targets
+    are correctly waived from the value-shape requirement.
+    """
     failures: list[dict[str, Any]] = []
-    chunks = re.split(r"^###+\s+", measure_text, flags=re.MULTILINE)[1:]
-    for c in chunks:
-        first = c.split("\n", 1)[0].strip()
+    categories = _split_metric_categories(measure_text)
+    # Either we found categories (new format) or we got an empty dict — fall
+    # back to flat-list reading if no categories were parsed.
+    flat: list[tuple[str, str, str]] = []  # (category, name, body)
+    if any(categories.values()):
+        for category, metrics in categories.items():
+            for m in metrics:
+                flat.append((category, m["name"], m["body"]))
+    else:
+        # Legacy fallback: every ### block is an output.
+        chunks = re.split(r"^###+\s+", measure_text, flags=re.MULTILINE)[1:]
+        for c in chunks:
+            first = c.split("\n", 1)[0].strip()
+            body = c.split("\n", 1)[1] if "\n" in c else ""
+            flat.append(("output", first, body))
+
+    for category, name, body in flat:
         # Definition has units?
-        def_match = re.search(r"\*\*Definition\*\*\s*:?\s*([^\n]+)", c, re.IGNORECASE)
-        if def_match and not _UNIT_TOKENS.search(def_match.group(1)):
-            failures.append({"metric": first, "check": "definition_has_units",
-                             "evidence": def_match.group(1).strip()[:80]})
+        def_match = re.search(
+            r"\*\*Definition\*\*\s*:|\*\*Definition:\*\*|^\s*Definition\s*:",
+            body, re.MULTILINE | re.IGNORECASE,
+        )
+        if def_match:
+            after = body[def_match.end():].split("\n", 1)[0]
+            if not _UNIT_TOKENS.search(after):
+                failures.append({"metric": f"[{category}] {name}",
+                                 "check": "definition_has_units",
+                                 "evidence": after.strip()[:80]})
         # Baseline shape
-        base_match = re.search(r"\*\*Baseline\*\*\s*:?\s*([^\n]+)", c, re.IGNORECASE)
-        if base_match and not _VALUE_TOKEN.search(base_match.group(1)):
-            failures.append({"metric": first, "check": "baseline_value_shape",
-                             "evidence": base_match.group(1).strip()[:80]})
-        # Target shape
-        targ_match = re.search(r"\*\*Target\*\*\s*:?\s*([^\n]+)", c, re.IGNORECASE)
-        if targ_match and not _VALUE_TOKEN.search(targ_match.group(1)):
-            failures.append({"metric": first, "check": "target_value_shape",
-                             "evidence": targ_match.group(1).strip()[:80]})
+        base_match = re.search(
+            r"\*\*Baseline\*\*\s*:|\*\*Baseline:\*\*|^\s*Baseline\s*:",
+            body, re.MULTILINE | re.IGNORECASE,
+        )
+        if base_match:
+            after = body[base_match.end():].split("\n", 1)[0]
+            if not _VALUE_TOKEN.search(after):
+                failures.append({"metric": f"[{category}] {name}",
+                                 "check": "baseline_value_shape",
+                                 "evidence": after.strip()[:80]})
+        # Target shape — N/A allowed for external category.
+        targ_match = re.search(
+            r"\*\*Target\*\*\s*:|\*\*Target:\*\*|^\s*Target\s*:",
+            body, re.MULTILINE | re.IGNORECASE,
+        )
+        if targ_match:
+            after = body[targ_match.end():].split("\n", 1)[0]
+            if category == "external":
+                if not (_VALUE_TOKEN.search(after) or re.search(r"\bN/?A\b", after, re.IGNORECASE)):
+                    failures.append({"metric": f"[{category}] {name}",
+                                     "check": "target_value_or_na",
+                                     "evidence": after.strip()[:80]})
+            else:
+                if not _VALUE_TOKEN.search(after):
+                    failures.append({"metric": f"[{category}] {name}",
+                                     "check": "target_value_shape",
+                                     "evidence": after.strip()[:80]})
     return failures
 
 
@@ -548,11 +683,11 @@ def check_causal_chain(spec_text: str) -> dict[str, Any]:
     """Inspect the Analyze section's causal-chain table; verify every output
     metric has at least one controllable input listed.
 
-    Returns {"all_outputs_traced": bool, "missing": [...], "table_found": bool}.
+    A placeholder row (output name wrapped in `<...>` or controllable cell
+    wrapped in `<...>`) means the spec is incomplete — counted as a failure,
+    not silently skipped. The headline G4 gate must fire on unfilled drafts.
     """
     analyze = _section(spec_text, "Analyze") or ""
-    # Look for the Markdown table whose header mentions "Output Metric" and
-    # "Controllable Input" in the header row.
     table_match = re.search(
         r"(\|[^\n]*Output Metric[^\n]*Controllable Input[^\n]*\|)\s*\n"
         r"\|[\s\-:|]+\|\s*\n"
@@ -563,26 +698,45 @@ def check_causal_chain(spec_text: str) -> dict[str, Any]:
         return {
             "all_outputs_traced": False,
             "missing": [],
+            "placeholder_rows": [],
+            "real_rows_checked": 0,
             "table_found": False,
             "evidence": "no causal-chain table found in Analyze (expected header row with 'Output Metric' and 'Controllable Input' columns)",
         }
     rows = [r.strip() for r in table_match.group(2).splitlines() if r.strip().startswith("|")]
     missing: list[str] = []
+    placeholder_rows: list[str] = []
+    real_rows = 0
     for row in rows:
         cells = [c.strip() for c in row.strip("|").split("|")]
         if len(cells) < 2:
             continue
         output_name, controllable = cells[0], cells[1]
-        # Skip placeholder rows
-        if output_name.startswith("<") and output_name.endswith(">"):
+        is_placeholder_output = (
+            (output_name.startswith("<") and output_name.endswith(">"))
+            or output_name.startswith("[") and output_name.endswith("]")
+        )
+        is_placeholder_controllable = (
+            (controllable.startswith("<") and controllable.endswith(">"))
+            or controllable.startswith("[") and controllable.endswith("]")
+            or controllable.lower() in ("none", "n/a", "")
+        )
+        if is_placeholder_output or is_placeholder_controllable:
+            placeholder_rows.append(output_name)
+            # Count as missing — an unfilled row is an unfilled spec.
+            missing.append(output_name + " (placeholder)")
             continue
-        if not controllable or controllable.startswith("<") or controllable.lower() in ("none", "n/a"):
+        real_rows += 1
+        if not controllable:
             missing.append(output_name)
     return {
-        "all_outputs_traced": not missing,
+        # Strict success requires at least one real row AND zero unfilled rows
+        # AND every real row traced.
+        "all_outputs_traced": real_rows >= 1 and not missing,
         "missing": missing,
+        "placeholder_rows": placeholder_rows,
+        "real_rows_checked": real_rows,
         "table_found": True,
-        "rows_checked": len(rows),
     }
 
 
@@ -599,14 +753,31 @@ _DEPARTMENT_DENYLIST = {
 
 def validate_owner(owner: str) -> dict[str, Any]:
     """Reject department-shaped owners. People are accountable; departments
-    aren't. Returns {"ok": bool, "reason": str}."""
+    aren't. Returns {"ok": bool, "reason": str}.
+
+    Catches both single-token forms ("Operations") and multi-token forms
+    ("Operations Team", "GIX Operations") by checking whether any denylist
+    word appears as a token in the normalized name.
+    """
     bare = owner.replace("[[", "").replace("]]", "").strip().lower()
-    # Strip parenthetical role qualifiers like "[[Mike]] (interim)".
     bare = re.sub(r"\([^)]*\)", "", bare).strip()
     if not bare:
         return {"ok": False, "reason": "owner is empty"}
+    # Whole-string match (catches "the team", "operations" alone)
     if bare in _DEPARTMENT_DENYLIST:
         return {"ok": False, "reason": f"'{owner}' is a department, not a person — name a specific accountable individual"}
+    # Token-overlap match (catches "Operations Team", "Engineering Department")
+    bare_tokens = set(re.findall(r"\b[a-z]+\b", bare))
+    overlap = bare_tokens & _DEPARTMENT_DENYLIST
+    if overlap:
+        return {
+            "ok": False,
+            "reason": (
+                f"'{owner}' contains department-shaped token(s) {sorted(overlap)} — "
+                "name a specific accountable individual (e.g. '[[Sarah Chen]]' "
+                "instead of 'Operations Team' or 'GIX Operations')"
+            ),
+        }
     return {"ok": True, "reason": "ok"}
 
 

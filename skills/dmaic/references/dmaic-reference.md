@@ -44,7 +44,7 @@ A five-phase improvement cycle from Six Sigma, applied to any process where you 
 1. **Mechanisms over philosophy.** "Get better every day" is a wish. A DMAIC cycle with named metrics and regression detection is a mechanism.
 2. **Measure before you improve.** Establish a baseline first, even if the numbers are embarrassing.
 3. **Control is not optional.** Every improvement without a regression guard is temporary.
-4. **Terminal metrics are the only ones that matter.** Intermediate metrics are for diagnosis, not justification.
+4. **Outputs confirm; inputs are the levers.** Cap output (terminal) metrics at 2–3. Track as many controllable input metrics as actually drive the outputs — those are what the operator changes when an output goes red. Track external input metrics too, so you can tell drift from noise. The Analyze causal chain forces every output to trace to ≥1 controllable input — without that, the spec produces dashboards no one can act on.
 5. **Failed experiments are data.** Log every attempt. The pattern of failures is often more informative than successes.
 6. **Owners own their own DMAIC.** Each owner inventories their own processes and builds their own improvement cycles.
 7. **Evolve the framework.** This reference is v1.0. Propose improvements as you learn what works.
