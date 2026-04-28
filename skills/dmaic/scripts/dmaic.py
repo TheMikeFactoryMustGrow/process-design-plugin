@@ -311,9 +311,11 @@ def _split_metric_categories(measure_text: str) -> dict[str, list[dict[str, str]
     return out
 
 
+# Case-sensitive on purpose: real placeholders are lowercase tokens
+# (`<units>`, `[details TBD]`); legitimate uppercased references like
+# `[Q1 2026]` should NOT trigger the placeholder rejector. Keep IGNORECASE off.
 _INLINE_PLACEHOLDER = re.compile(
-    r"<[a-z][a-z0-9_\- ]{0,30}>|\[[a-z][a-z0-9_\- ]{0,30}\]",
-    re.IGNORECASE,
+    r"<[a-z][a-z0-9_\- ]{0,30}>|\[[a-z][a-z0-9_\- ]{0,30}\]"
 )
 
 
@@ -334,9 +336,15 @@ def _metric_field_has_value(metric_body: str, field: str, allow_na: bool) -> boo
     if not match:
         return False
     value = match.group(1).strip()
-    # Strip trailing italic / annotation
-    bare = re.sub(r"_[^_]+_$", "", value).strip()
-    bare = re.sub(r"\*[^*]+\*$", "", bare).strip()
+    # If the entire value is italic (e.g. `_N/A — track only_` from the
+    # template), strip just the italic markers to expose the inner text.
+    # Otherwise, strip trailing italic ANNOTATIONS only — content stays.
+    italic_only_match = re.fullmatch(r"_(.+)_", value) or re.fullmatch(r"\*(.+)\*", value)
+    if italic_only_match:
+        bare = italic_only_match.group(1).strip()
+    else:
+        bare = re.sub(r"_[^_]+_$", "", value).strip()
+        bare = re.sub(r"\*[^*]+\*$", "", bare).strip()
     if not bare:
         return False
     # Whole-string placeholder
@@ -358,15 +366,21 @@ def _metric_field_has_value(metric_body: str, field: str, allow_na: bool) -> boo
 def _section(text: str, name: str) -> str | None:
     """Return the body of a top-level section by heading name, or None.
 
-    Stops at the next H1/H2 heading or end-of-file. Horizontal `---` rules
-    inside the section are NOT treated as section endings — many specs use
-    them as visual separators between metrics or sub-blocks.
+    Section boundary rules:
+    - Compose-output specs separate phases with `---` horizontal rules between
+      `## Phase` headings, so the canonical end-of-section marker is the
+      `---` divider followed by the next `## Phase` header (or end-of-file).
+    - We deliberately do NOT stop at any random H1/H2 inside the body — agents
+      can write `## Recent Experiments` inside Improve, `## Notes` inside
+      Control, etc., and validators must still see the full body.
+    - Inner `---` rules (between metrics, between sub-sections) DO NOT close
+      the section; only `---` followed by `## ` (with a phase name) does.
     """
-    m = re.search(
-        rf"^#{{1,2}}\s+{re.escape(name)}\b.*?(?=^#{{1,2}}\s+\S|\Z)",
-        text,
+    pattern = re.compile(
+        rf"^#{{1,2}}\s+{re.escape(name)}\b.*?(?=^---\s*$\n##\s+\S|\Z)",
         re.MULTILINE | re.DOTALL,
     )
+    m = pattern.search(text)
     return m.group(0) if m else None
 
 
