@@ -167,12 +167,28 @@ def compose_spec(spec: dict[str, Any]) -> str:
     # If the agent pasted a per-phase block that itself begins with `## Phase`
     # (e.g. from a per-phase skill's standalone Output format), strip the
     # leading H2 so we don't end up with two `## Define` rows.
+    #
+    # Two guards:
+    #   - Require the H2 to be followed by whitespace or end-of-line, so
+    #     `## ImproveSomething` is NOT stripped to `Something`.
+    #   - If stripping would leave the block empty, return the original
+    #     block — better to write `## Define\n\n## Define` (caught by
+    #     validator) than silently produce an empty section.
     def _strip_h2(block: str, phase_name: str) -> str:
         stripped = block.strip()
-        prefix = f"## {phase_name}"
-        if stripped.startswith(prefix):
-            stripped = stripped[len(prefix):].lstrip("\n").strip()
-        return stripped
+        # If the block is empty after strip, emit a visible placeholder rather
+        # than producing an empty section that quietly passes section_present.
+        if not stripped:
+            return f"_(empty — fill in the {phase_name} block before promoting)_"
+        # Match `## Phase` followed by whitespace or end-of-string only — so
+        # `## ImproveSomething` is NOT stripped.
+        m = re.match(rf"^##\s+{re.escape(phase_name)}(?=\s|$)", stripped)
+        if not m:
+            return stripped
+        candidate = stripped[m.end():].lstrip("\n").strip()
+        if not candidate:
+            return f"_(empty — the {phase_name} block contained only its heading; fill in content before promoting)_"
+        return candidate
 
     body_lines.extend([
         "---",
@@ -244,40 +260,49 @@ def _split_metric_categories(measure_text: str) -> dict[str, list[dict[str, str]
     out: dict[str, list[dict[str, str]]] = {
         "output": [], "controllable": [], "external": [],
     }
-    # Split into ### H3 sections.
+
+    def _is_category(head_lower: str) -> str | None:
+        if "output metric" in head_lower:
+            return "output"
+        if "controllable input metric" in head_lower:
+            return "controllable"
+        if "external input metric" in head_lower:
+            return "external"
+        return None
+
+    # Pre-scan: are ANY of the three category H3s present?
     h3_sections = re.split(r"^###\s+", measure_text, flags=re.MULTILINE)
-    if len(h3_sections) <= 1:
-        # No H3 categories. Try the H4-only legacy form (`#### Metric N`
-        # directly under `## Measure`) — treat every H4 as an output, the
-        # safest interpretation for unknown structure.
-        h4_blocks = re.split(r"^####\s+", measure_text, flags=re.MULTILINE)
-        for h4 in h4_blocks[1:]:
-            metric_first = h4.split("\n", 1)[0].strip()
-            metric_body = h4.split("\n", 1)[1] if "\n" in h4 else ""
-            out["output"].append({"name": metric_first, "body": metric_body})
+    has_categories = any(
+        _is_category(chunk.split("\n", 1)[0].strip().lower())
+        for chunk in h3_sections[1:]
+    )
+
+    if not has_categories:
+        # Legacy mode: no category H3s at all. Two sub-modes:
+        #   1. ### Metric N blocks (older flat-H3 specs) → each H3 is an output
+        #   2. #### Metric N directly under ## Measure (no H3s at all) → each H4 is an output
+        if len(h3_sections) > 1:
+            for chunk in h3_sections[1:]:
+                first_line = chunk.split("\n", 1)[0].strip()
+                body = chunk.split("\n", 1)[1] if "\n" in chunk else ""
+                out["output"].append({"name": first_line, "body": body})
+        else:
+            h4_blocks = re.split(r"^####\s+", measure_text, flags=re.MULTILINE)
+            for h4 in h4_blocks[1:]:
+                metric_first = h4.split("\n", 1)[0].strip()
+                metric_body = h4.split("\n", 1)[1] if "\n" in h4 else ""
+                out["output"].append({"name": metric_first, "body": metric_body})
         return out
-    # First chunk is preamble before the first H3; skip it.
-    found_categories = False
+
+    # New mode: at least one category H3 found. Walk H3 sections; non-category
+    # H3s (e.g. `### Notes`, `### Context`) are IGNORED — not silently
+    # mis-attributed to outputs. This fixes the iter-3 random-H3 mis-attribution.
     for chunk in h3_sections[1:]:
         first_line = chunk.split("\n", 1)[0].strip()
         body = chunk.split("\n", 1)[1] if "\n" in chunk else ""
-        head_lower = first_line.lower()
-        if "output metric" in head_lower:
-            cat = "output"
-            found_categories = True
-        elif "controllable input metric" in head_lower:
-            cat = "controllable"
-            found_categories = True
-        elif "external input metric" in head_lower:
-            cat = "external"
-            found_categories = True
-        else:
-            # H3 block that isn't a category — treat as legacy flat-list metric.
-            if not found_categories:
-                # legacy: every H3 block is an output
-                out["output"].append({"name": first_line, "body": body})
-            continue
-        # Within this category, find #### Metric blocks.
+        cat = _is_category(first_line.lower())
+        if cat is None:
+            continue  # ignore non-category H3s
         h4_blocks = re.split(r"^####\s+", body, flags=re.MULTILINE)
         for h4 in h4_blocks[1:]:
             metric_first = h4.split("\n", 1)[0].strip()
@@ -286,13 +311,20 @@ def _split_metric_categories(measure_text: str) -> dict[str, list[dict[str, str]
     return out
 
 
+_INLINE_PLACEHOLDER = re.compile(
+    r"<[a-z][a-z0-9_\- ]{0,30}>|\[[a-z][a-z0-9_\- ]{0,30}\]",
+    re.IGNORECASE,
+)
+
+
 def _metric_field_has_value(metric_body: str, field: str, allow_na: bool) -> bool:
     """Check that a metric body has `Field:` followed by a non-placeholder value.
 
     Accepts both `**Field:**` (canonical, template form) and `**Field**:` and
-    bare `Field:` shapes. The post-colon value must be non-empty and not a
-    `<placeholder>` or `[placeholder]` token. When allow_na, the literal
-    'N/A' (case-insensitive) is also accepted.
+    bare `Field:` shapes. The post-colon value must be non-empty and contain
+    no `<placeholder>` or `[placeholder]` substrings — even partial values
+    like `Net Revenue Retention <units>` are rejected. When allow_na, the
+    literal 'N/A' (case-insensitive) is also accepted.
     """
     pattern = re.compile(
         rf"(?:\*\*{field}\*\*\s*:|\*\*{field}:\*\*|^\s*{field}\s*:)\s*(\S[^\n]*)",
@@ -305,10 +337,15 @@ def _metric_field_has_value(metric_body: str, field: str, allow_na: bool) -> boo
     # Strip trailing italic / annotation
     bare = re.sub(r"_[^_]+_$", "", value).strip()
     bare = re.sub(r"\*[^*]+\*$", "", bare).strip()
-    # Reject obvious placeholders.
+    if not bare:
+        return False
+    # Whole-string placeholder
     if (bare.startswith("<") and bare.endswith(">")) or (bare.startswith("[") and bare.endswith("]")):
         return False
-    if not bare:
+    # Inline / partial placeholder substrings (e.g. `Net Revenue Retention <units>`).
+    # Any `<lowercase-thing>` or `[lowercase-thing]` of plausible placeholder shape
+    # means the agent left something unfilled — fail.
+    if _INLINE_PLACEHOLDER.search(bare):
         return False
     if allow_na and bare.upper().startswith("N/A"):
         return True
@@ -704,11 +741,15 @@ def scaffold_phase(phase: str, metrics: int = 3, experiments: int = 1) -> str:
     if phase == "define":
         return _DEFINE_SCAFFOLD
     if phase == "measure":
+        if metrics < 1:
+            raise ValueError(
+                f"--metrics must be >= 1 (got {metrics}); a Measure scaffold needs at least one output metric"
+            )
         output_blocks = "\n".join(_METRIC_BLOCK.format(n=i+1) for i in range(metrics))
         controllable = "\n".join(_METRIC_BLOCK.format(n=f"C{i+1}") for i in range(metrics))
-        # External metrics use Target: N/A — track only — the principle is
-        # external inputs aren't optimized, just tracked.
-        external = "\n".join(_EXTERNAL_METRIC_BLOCK.format(n=f"E{i+1}") for i in range(max(1, metrics-1)))
+        # External metrics: scaffold one external block by default; the count
+        # doesn't couple to outputs (externals bound levers, not outputs).
+        external = _EXTERNAL_METRIC_BLOCK.format(n="E1")
         return _MEASURE_SCAFFOLD_TEMPLATE.format(
             output_blocks=output_blocks,
             controllable_blocks=controllable,
