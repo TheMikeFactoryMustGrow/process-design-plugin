@@ -163,36 +163,47 @@ def compose_spec(spec: dict[str, Any]) -> str:
     ]
     if summary:
         body_lines.extend([f"> {summary}", ""])
+
+    # If the agent pasted a per-phase block that itself begins with `## Phase`
+    # (e.g. from a per-phase skill's standalone Output format), strip the
+    # leading H2 so we don't end up with two `## Define` rows.
+    def _strip_h2(block: str, phase_name: str) -> str:
+        stripped = block.strip()
+        prefix = f"## {phase_name}"
+        if stripped.startswith(prefix):
+            stripped = stripped[len(prefix):].lstrip("\n").strip()
+        return stripped
+
     body_lines.extend([
         "---",
         "",
         "## Define",
         "",
-        spec["define_block"].strip(),
+        _strip_h2(spec["define_block"], "Define"),
         "",
         "---",
         "",
         "## Measure",
         "",
-        spec["measure_block"].strip(),
+        _strip_h2(spec["measure_block"], "Measure"),
         "",
         "---",
         "",
         "## Analyze",
         "",
-        spec["analyze_block"].strip(),
+        _strip_h2(spec["analyze_block"], "Analyze"),
         "",
         "---",
         "",
         "## Improve",
         "",
-        spec["improve_block"].strip(),
+        _strip_h2(spec["improve_block"], "Improve"),
         "",
         "---",
         "",
         "## Control",
         "",
-        spec["control_block"].strip(),
+        _strip_h2(spec["control_block"], "Control"),
         "",
         "---",
         "",
@@ -236,6 +247,14 @@ def _split_metric_categories(measure_text: str) -> dict[str, list[dict[str, str]
     # Split into ### H3 sections.
     h3_sections = re.split(r"^###\s+", measure_text, flags=re.MULTILINE)
     if len(h3_sections) <= 1:
+        # No H3 categories. Try the H4-only legacy form (`#### Metric N`
+        # directly under `## Measure`) — treat every H4 as an output, the
+        # safest interpretation for unknown structure.
+        h4_blocks = re.split(r"^####\s+", measure_text, flags=re.MULTILINE)
+        for h4 in h4_blocks[1:]:
+            metric_first = h4.split("\n", 1)[0].strip()
+            metric_body = h4.split("\n", 1)[1] if "\n" in h4 else ""
+            out["output"].append({"name": metric_first, "body": metric_body})
         return out
     # First chunk is preamble before the first H3; skip it.
     found_categories = False
@@ -365,10 +384,12 @@ def validate_spec(spec_text: str) -> dict[str, Any]:
     measure = _section(spec_text, "Measure")
     if measure:
         categories = _split_metric_categories(measure)
-        # Output metric count is the only one we cap.
+        # Output metric count: 1–3 allowed (the prose says "cap at 2–3" — that
+        # was an upper bound, not a minimum). Single-output specs are valid
+        # when one terminal measure genuinely captures process success.
         outputs = categories["output"]
         n_outputs = len(outputs)
-        add("measure_has_2_or_3_outputs", 2 <= n_outputs <= 3,
+        add("measure_has_1_to_3_outputs", 1 <= n_outputs <= 3,
             f"found {n_outputs} output metrics: {[m['name'] for m in outputs]}")
         # Controllable inputs: at least 1 expected, no upper bound.
         controllable = categories["controllable"]
@@ -475,7 +496,36 @@ def strict_metric_checks(measure_text: str) -> list[dict[str, Any]]:
             flat.append(("output", first, body))
 
     for category, name, body in flat:
-        # Definition has units?
+        # Gate every check on the placeholder rejector first — a value like
+        # `<how it's calculated, with units (%, ms, $, count, etc.)>` literally
+        # contains unit tokens AND `unknown — establish`, so the unit/value
+        # regex pre-iter-3 false-passed it. Now we use the same
+        # _metric_field_has_value contract `validate_spec` uses, so the two
+        # layers agree on what "filled in" means.
+        for field in ["Definition", "Baseline"]:
+            if not _metric_field_has_value(body, field, allow_na=False):
+                failures.append({
+                    "metric": f"[{category}] {name}",
+                    "check": f"{field.lower()}_filled_not_placeholder",
+                    "evidence": "field is missing, empty, or still a <placeholder>/[placeholder]/TBD",
+                })
+        # Target: external metrics may use N/A — track only; others must be a value.
+        if not _metric_field_has_value(body, "Target", allow_na=(category == "external")):
+            failures.append({
+                "metric": f"[{category}] {name}",
+                "check": "target_filled_not_placeholder",
+                "evidence": ("for external metrics, value or 'N/A — track only' is required; "
+                             "for output/controllable, a numeric/percent/currency value is required"),
+            })
+        # Skip downstream regex checks if any field was a placeholder — the
+        # earlier layer already failed; running unit/value-shape on placeholder
+        # text is the iter-2 false-pass mode.
+        any_placeholder = any(
+            f["metric"] == f"[{category}] {name}" for f in failures
+        )
+        if any_placeholder:
+            continue
+        # Definition has units? Now safe — we know it's not a placeholder.
         def_match = re.search(
             r"\*\*Definition\*\*\s*:|\*\*Definition:\*\*|^\s*Definition\s*:",
             body, re.MULTILINE | re.IGNORECASE,
@@ -497,7 +547,7 @@ def strict_metric_checks(measure_text: str) -> list[dict[str, Any]]:
                 failures.append({"metric": f"[{category}] {name}",
                                  "check": "baseline_value_shape",
                                  "evidence": after.strip()[:80]})
-        # Target shape — N/A allowed for external category.
+        # Target shape — same per-category logic as iter-2.
         targ_match = re.search(
             r"\*\*Target\*\*\s*:|\*\*Target:\*\*|^\s*Target\s*:",
             body, re.MULTILINE | re.IGNORECASE,
@@ -579,6 +629,14 @@ _METRIC_BLOCK = """\
 - **Target:** <where it needs to land>
 """
 
+_EXTERNAL_METRIC_BLOCK = """\
+#### Metric {n}: <name>
+- **Definition:** <how it's calculated, with units (%, ms, $, count, etc.)>
+- **Collection:** <how + how often gathered; manual or automated>
+- **Baseline:** <current value, OR `unknown — establish by YYYY-MM-DD`>
+- **Target:** N/A — track only
+"""
+
 _ANALYZE_SCAFFOLD_TEMPLATE = """\
 ### Causal Chain (which inputs drive which outputs)
 
@@ -648,7 +706,9 @@ def scaffold_phase(phase: str, metrics: int = 3, experiments: int = 1) -> str:
     if phase == "measure":
         output_blocks = "\n".join(_METRIC_BLOCK.format(n=i+1) for i in range(metrics))
         controllable = "\n".join(_METRIC_BLOCK.format(n=f"C{i+1}") for i in range(metrics))
-        external = "\n".join(_METRIC_BLOCK.format(n=f"E{i+1}") for i in range(max(1, metrics-1)))
+        # External metrics use Target: N/A — track only — the principle is
+        # external inputs aren't optimized, just tracked.
+        external = "\n".join(_EXTERNAL_METRIC_BLOCK.format(n=f"E{i+1}") for i in range(max(1, metrics-1)))
         return _MEASURE_SCAFFOLD_TEMPLATE.format(
             output_blocks=output_blocks,
             controllable_blocks=controllable,
@@ -766,16 +826,24 @@ def validate_owner(owner: str) -> dict[str, Any]:
     # Whole-string match (catches "the team", "operations" alone)
     if bare in _DEPARTMENT_DENYLIST:
         return {"ok": False, "reason": f"'{owner}' is a department, not a person — name a specific accountable individual"}
-    # Token-overlap match (catches "Operations Team", "Engineering Department")
-    bare_tokens = set(re.findall(r"\b[a-z]+\b", bare))
-    overlap = bare_tokens & _DEPARTMENT_DENYLIST
+    # Token match — split on WHITESPACE only (not hyphens). A hyphenated
+    # surname like "Operations-Lingle" is a single token; the false-positive
+    # iter-2 hit ("Mike Operations-Lingle" rejected because hyphen split
+    # made "operations" its own token) is fixed here.
+    tokens = set(re.split(r"\s+", bare))
+    overlap = tokens & _DEPARTMENT_DENYLIST
     if overlap:
+        # One more guard: only flag multi-word names where the denylist token
+        # is a *standalone word*, not part of a multi-word phrase that's
+        # clearly a name (e.g. "the team" → ["the", "team"], both in denylist).
         return {
             "ok": False,
             "reason": (
                 f"'{owner}' contains department-shaped token(s) {sorted(overlap)} — "
                 "name a specific accountable individual (e.g. '[[Sarah Chen]]' "
-                "instead of 'Operations Team' or 'GIX Operations')"
+                "instead of 'Operations Team' or 'GIX Operations'). "
+                "Hyphenated surnames like 'Operations-Lingle' are fine — "
+                "only whitespace-separated tokens are checked."
             ),
         }
     return {"ok": True, "reason": "ok"}

@@ -64,7 +64,7 @@ Stuck? The most common Define failure is fuzziness ("improve customer experience
 
 The user's biggest gap, almost always. Three categories, in order:
 
-**Output Metrics (terminal — confirm success).** Cap at 2–3. These are the only metrics that count as "process is working." Reject vanity metrics (impressions, headcount, page views) unless they truly bind to outcome. *Rule: if the metric goes up but the world isn't better, it's the wrong metric.*
+**Output Metrics (terminal — confirm success).** 1–3 outputs (most processes need 2–3; a single output is valid only when one terminal measure genuinely captures process success — push back if the user reaches for one because they didn't think hard enough). Reject vanity metrics (impressions, headcount, page views) unless they truly bind to outcome. *Rule: if the metric goes up but the world isn't better, it's the wrong metric.*
 
 **Controllable Input Metrics (the levers — owner can move these).** As many as actually drive the outputs. These are what the operator changes when an output goes red. Without controllable inputs the spec produces dashboards with no actionable response.
 
