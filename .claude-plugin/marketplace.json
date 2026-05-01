@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "process-design",
-      "description": "Eight composable skills for designing processes that build agents can actually execute. The headliner walks you through Working Backwards, metrics design, Elon's algorithm, gap probing, TDD-style verification, drafting, adversarial verification, and build handoff. Sibling skills qa-agents (Finder/Auditor/Referee adversarial review) and dmaic + 5 phase skills (Define/Measure/Analyze/Improve/Control) are independently invokable.",
+      "description": "Eight composable skills for designing processes that build agents can actually execute. The headliner walks you through Steps 0–8: optional Ingest of an existing description, Working Backwards anchor with distributed deletion at every sub-step, parallel gap-probe fan-out, early Render of the flowchart with a hard-gate user review BEFORE metrics design, concentrated final pruning post-visual, metrics across four categories, review cadence + DMAIC handoff, structural + adversarial Verify, build-target handoff, and optional spec↔source Reconcile. The flowchart is the primary deliverable and is foreground-surfaced in the agent response. Sibling skills qa-agents (Finder/Auditor/Referee adversarial review) and dmaic + 5 phase skills (Define/Measure/Analyze/Improve/Control) are independently invokable.",
       "category": "productivity",
       "source": "./plugins/process-design",
       "homepage": "https://github.com/TheMikeFactoryMustGrow/process-design-plugin"
