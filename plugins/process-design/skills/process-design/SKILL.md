@@ -2,41 +2,52 @@
 name: process-design
 description: >-
   Collaborate with the user as a thought partner to design a process and produce an
-  agent-readable spec ready to hand to a build agent (Claude Code, Claude Design, Python
-  script, Lambda function, or any other target). Apply Working Backwards methodology to
-  anchor on the desired output. Design measurement upfront across four metric categories
-  before deletion decisions. Apply Elon's operating algorithm to question and aggressively
-  delete. Stress-test inputs and surface edge cases. Verify the spec adversarially using
-  the bundled qa-agents skill (finder + auditor + referee). Use sub-agent fan-out for MECE
-  parallelizable work. Distinguish script-doable structural checks from agent-required
-  semantic judgment. Produce a structured spec with explicit decision rules, requirement
-  owners, per-step metrics, gates as visible diagram nodes, edge case handling, an
-  implementation-agnostic build-handoff section, and a metrics review plan; render a
-  Mermaid diagram with inline requirement-owner annotations. Internal gates between
-  phases use iterate-in-place with soft fail (after one iteration attempt, log the gap
-  as an open question and proceed). Use when the user says "design a process", "spec
-  this out for an agent", "help me think through this workflow", "make this agent-readable",
-  "draft a flowchart", "turn this into something Claude Code can build", "stress-test
-  this design", "what edge cases am I missing", "I do this all the time but haven't
-  defined it", or "document this so it can be built". Also use when the user uploads a
-  hand-drawn diagram, an existing flowchart, or a description of a process they want
-  hardened. This skill should trigger liberally — if there is any signal the user wants
-  a process designed, hardened, or made build-ready, use this skill.
+  agent-readable spec PLUS a rendered, foreground-surfaced flowchart, ready to hand
+  to a build agent (Claude Code, Claude Design, Python script, Lambda function, or
+  any other target). Apply Working Backwards methodology to anchor on the desired
+  output. Apply distributed deletion at every sub-step (challenge each addition at
+  the moment it is added, not after). Render the visual EARLY, before metrics
+  design, and gate it on explicit user confirmation — the flowchart is the primary
+  deliverable and must be foreground-surfaced in the agent response, never buried.
+  Stress-test inputs and surface edge cases via parallel sub-agent fan-out. Verify
+  the spec adversarially using the bundled qa-agents skill (finder + auditor +
+  referee). Distinguish script-doable structural checks from agent-required
+  semantic judgment. Produce a structured spec with explicit decision rules,
+  requirement owners, per-step metrics, gates as visible diagram nodes, edge case
+  handling, an implementation-agnostic build-handoff section, and a metrics review
+  plan. Internal gates between phases use iterate-in-place with soft fail (after
+  one iteration attempt, log the gap as an open question and proceed). Use when the
+  user says "design a process", "spec this out for an agent", "help me think
+  through this workflow", "make this agent-readable", "draft a flowchart", "turn
+  this into something Claude Code can build", "stress-test this design", "what
+  edge cases am I missing", "I do this all the time but haven't defined it",
+  or "document this so it can be built". Also use when the user uploads a
+  hand-drawn diagram, an existing flowchart, or a description of a process they
+  want hardened. This skill should trigger liberally — if there is any signal the
+  user wants a process designed, hardened, or made build-ready, use this skill.
 compatibility: >-
-  Phase 7 invokes the bundled qa-agents skill via the Skill tool, which requires the
-  Task tool. Phase 4 *fan-out* uses Task when available and falls back to in-conversation
-  sequential prompting otherwise (the phase itself runs in any environment). Helper
-  scripts in `scripts/` are Python 3 with stdlib only.
-version: 0.1.0
+  Phase 6 (Verify) invokes the bundled qa-agents skill via the Skill tool, which
+  requires the Task tool. Step 1-exit gap-probe fan-out uses Task when available
+  and falls back to in-conversation sequential prompting otherwise (the step
+  itself runs in any environment, with the mode logged in the Verification
+  Record). Step 2 (Render) uses `mmdc` (Mermaid CLI) when available and falls back
+  to Obsidian-renderable fenced markdown otherwise. Helper scripts in `scripts/`
+  are Python 3 with stdlib only.
+version: 0.2.0
 ---
 
-# Process Design (Thought-Partner Mode → Build-Ready Spec)
+# Process Design (Thought-Partner Mode → Reviewable Flowchart + Build-Ready Spec)
 
-This skill collaborates with the user to take a fuzzy process description (or no description, just an intuition) and harden it into a spec a build agent can implement without asking. The output is a single markdown file containing a structured spec (canonical, agent-readable) and a Mermaid diagram (derived, human-readable) annotated with requirement owners and verification gates.
+This skill collaborates with the user to take a fuzzy process description (or no description, just an intuition) and harden it into a reviewable flowchart backed by an agent-readable spec.
 
-The skill's goal is not to draw a flowchart. The goal is to ask good questions, pressure-test the design, surface what's missing, and produce a first-pass artifact that's solid enough to take to a build agent without significant rework. The diagram inherits the quality of the design that produced it.
+The skill's two deliverables, in priority order:
 
-This skill ships inside the `process-design` plugin alongside `qa-agents` and the `dmaic` skill family. Phase 7 delegates adversarial verification to the bundled `qa-agents` skill rather than re-implementing the finder/auditor/referee pattern. The produced spec's Metrics Review Plan section points the user at `dmaic` for running review cycles.
+1. **PRIMARY** — A rendered flowchart (image file on disk, surfaced explicitly in the agent response) that the user can review at a glance.
+2. **SECONDARY** — A markdown spec supporting the flowchart: frontmatter, structured sections, metrics map, verification record. The spec is the audit trail; the flowchart is what the user actually consumes.
+
+The skill's goal is not to draw a flowchart for its own sake. The goal is to ask good questions, pressure-test the design, surface what's missing, and produce a first-pass artifact a build agent can implement without significant rework. The visual exists because **a process is reviewable iff its structure is visible at a glance** (P6 below). The spec exists because the visual alone can't carry the metric definitions, edge cases, and verification record that a build agent needs.
+
+This skill ships inside the `process-design` plugin alongside `qa-agents` and the `dmaic` skill family. Step 6 (Verify) delegates adversarial verification to the bundled `qa-agents` skill rather than re-implementing the finder/auditor/referee pattern. The produced spec's Metrics Review Plan section points the user at `dmaic` for running review cycles.
 
 ---
 
@@ -44,15 +55,28 @@ This skill ships inside the `process-design` plugin alongside `qa-agents` and th
 
 Read these files (in this order) every session:
 
-1. `references/elon-algorithm.md` — drives aggressive deletion in Phase 3
+1. `references/elon-algorithm.md` — drives the distributed deletion stance applied at every sub-step (Steps 1A–1D) plus the concentrated final pruning (Step 3)
 2. `references/metrics-principles.md` — the four metric categories, manage-inputs-not-outputs, metric evolution
 3. `references/test-writing.md` — the TDD principle applied to spec design (verification suite defined before drafting)
 4. `references/spec-principles.md` — the principles that make a spec agent-readable
 5. `templates/process-spec-template.md` — the output scaffold
 
-The DMAIC framing and QA Agents pattern are not bundled as reference docs — they live in the sibling skills. Invoke `Skill(dmaic)` if the user wants to walk a Metrics Review Plan, and `Skill(qa-agents)` for Phase 7 verification (see Phase 7 below).
+The DMAIC framing and QA Agents pattern are not bundled as reference docs — they live in the sibling skills. Invoke `Skill(dmaic)` if the user wants to walk a Metrics Review Plan, and `Skill(qa-agents)` for Step 6 verification (see Step 6 below).
 
-If the user has uploaded an image of a hand-drawn or printed flowchart, transcribe it to text first (nodes + edges + labels) and confirm the transcription with the user before doing anything else.
+If the user has uploaded an image of a hand-drawn or printed flowchart, **Step 0 (Ingest)** handles it — transcribe to text first (nodes + edges + labels), confirm the transcription with the user, then proceed.
+
+---
+
+## First Principles
+
+The procedure derives from six principles, not from convention. Every step justifies itself against one of them:
+
+- **P1.** A process is a function `Input → Output`. No defined output → no design possible.
+- **P2.** A process is *useful* iff its output produces value the inputs alone don't. Otherwise: overhead. (Powers distributed deletion.)
+- **P3.** A process is *correct* iff for valid inputs it produces the specified output, and for invalid inputs it produces a specified failure mode.
+- **P4.** A process is *measurable* iff its inputs, transitions, and output emit observable signal.
+- **P5.** A process is *improvable* iff measurement connects to a feedback loop that modifies it.
+- **P6.** A process is *reviewable* iff its structure is visible at a glance. **The flowchart is the primary deliverable.**
 
 ---
 
@@ -62,87 +86,126 @@ This skill is the place where comradery is most dangerous. Its job is to questio
 
 Concrete rules:
 
-- **Output first, inputs second, metrics third, steps last.** Always anchor on the desired output.
+- **Output first, inputs second, transitions third, failure modes fourth.** Always anchor on the desired output.
+- **Render early, review hard.** The flowchart is produced before metrics design, and a hard gate confirms the design with the user before metrics get wired.
 - **Manage inputs, not outputs.** Output metrics confirm success; controllable input metrics are what you can actually move.
 - **Every requirement is guilty until proven innocent.** Verify reasons. Departments cannot be held accountable; people can.
-- **Every step has metrics before it can be deleted.** Deletion can destroy measurement points; the metrics phase runs before the algorithm phase.
-- **Delete aggressively.** Bias toward subtraction. The 10% add-back ratio is a sanity check, not a target.
+- **Delete at the moment of addition.** P2 applies as a recurring constraint, not a single phase. Every input, every transition, every metric, every check is challenged when it is added.
+- **Plus a final pruning pass.** After the visual exists and bloat becomes visible, run the concentrated Elon pass. Two modes (distributed + concentrated), not either-or.
 - **Be wrong, not unconfident.** "I'm proposing to delete step 4 because X" beats "you might consider whether step 4 is necessary."
-- **Be a constructive partner, not just a critic.** Subtractive (Elon) and additive (gap probing) work are both required.
 - **Surface assumptions explicitly.** Anything inferred gets written down to confirm.
 - **Prefer scripts over agents for deterministic checks; reserve agents for judgment.** Faster, cheaper, more reliable.
 - **Fan out to sub-agents for MECE parallelizable work.** Independent agents catch what context-bleed misses.
+- **Foreground the visual.** The agent's final response always names the rendered image path on its own line. Never buried.
 
 ---
 
 ## Architecture Overview
 
-Eight phases. Phases 1–5 are dialogue (with internal gates between them). Phase 6 produces the artifact. Phases 7–8 verify and hand off.
+Nine steps (Steps 0–8). Step 0 and Step 8 are conditional. Steps 1A–1D run inside Step 1 with distributed deletion at each sub-step. Step 2 Review is the **HARD GATE** — user confirms the visual before metrics design proceeds.
 
 ```
-Phase 1: Working Backwards   → Output → success → consumers → controllable inputs
-  [Gate 1]
-Phase 2: Metrics Design      → Map measurement across four categories before deletion
-  [Gate 2]
-Phase 3: Apply the Algorithm → Question → Delete → Simplify → Parallelize
-  [Gate 3]
-Phase 4: Probe for Gaps      → Stress-test inputs, surface edge cases (sub-agent fan-out)
-  [Gate 4]
-Phase 5: Verification Suite  → Define what passing looks like before drafting (TDD)
-  [Gate 5]
-Phase 6: Draft               → Generate the spec from the template
-  [Gate 6 — deterministic structural checks via verify_spec.py]
-Phase 7: Verify Adversarially → Invoke qa-agents skill (semantic / adversarial layer)
-Phase 8: Build Handoff       → Implementation-agnostic prompt for the build agent
+Step 0: Ingest existing description?     (conditional — only fires if user supplied one)
+   ↓
+Step 1: Anchor — A/B/C/D with distributed deletion
+   ↓
+Step 1 exit: Gap-probe fan-out (4 sub-agents) with per-agent completion gate
+   ↓
+Step 2: Render — Mermaid → image file, validate post-render
+   ↓
+[Step 2 Review — HARD GATE: confirm / reject+named / reject-silent]
+   ↓ confirm
+Step 3: Final pruning — concentrated Elon pass against the visualized procedure
+   ↓
+Step 4: Metrics design — output / controllable input / agent / health
+   ↓
+Step 5: Review cadence + DMAIC plan + telemetry destination
+   ↓
+Step 6: Verify — verify_spec.py + qa-agents (or inline_simulation)
+   ↓
+Step 7: Handoff — build prompt + image path + spec path (foreground-surfaced)
+   ↓
+Step 8: Reconcile spec ↔ source description?  (conditional — only if Step 0 fired)
+   ↓
+[terminal: spec status:verified + flowchart image + build prompt]
 ```
 
-Phases 1–5 should be 30–50 minutes of conversation. Phases 6–8 are mostly mechanical given a clean Phase 5 output.
+Steps 1–2 should be 30–50 minutes of conversation. Steps 3–8 are mostly mechanical given a clean Step 2 confirmation.
 
-### Gate 6 vs. Phase 7 — explicit boundary
-
-Both verify, but the layers are non-overlapping. Gate 6 owns every check that can be expressed as a deterministic operation on the spec text; Phase 7 owns every check that needs judgment.
+### Step 6 vs. Phase 7-style adversarial verify — same boundary, renumbered
 
 | Layer | Tool | Catches |
 |---|---|---|
-| **Gate 6** (structural / topological) | `scripts/verify_spec.py` (which uses `parse_mermaid.py`) | Frontmatter parses, Mermaid parses, step-ID references resolve, every step has owner, every input has validation, all four metric categories present, **at least one terminal state reachable, no unreachable non-terminal nodes, no unbounded loops** (cycles without an exit edge). Deterministic — same spec → same result. |
-| **Phase 7** (adversarial / semantic) | `Skill(qa-agents)` | Untestable rules, missing edge cases, ambiguous decisions, weak metrics, unmotivated steps, internal contradictions in the prose, gaps the structural layer can't see. Judgment-based — different runs may surface different issues. |
+| **Step 6 structural** | `scripts/verify_spec.py` (uses `parse_mermaid.py`) | Frontmatter parses, Mermaid parses, step-ID references resolve, every step has owner, every input has validation, all four metric categories present, at least one terminal state reachable, no unreachable non-terminal nodes, no unbounded loops, **image_freshness (image mtime ≥ spec mtime when image present)**. Deterministic — same spec → same result. |
+| **Step 6 adversarial / semantic** | `Skill(qa-agents)` | Untestable rules, missing edge cases, ambiguous decisions, weak metrics, unmotivated steps, internal contradictions in the prose, gaps the structural layer can't see. Judgment-based — different runs may surface different issues. |
 
-If a check is script-doable, it belongs in Gate 6 — not Phase 7. Phase 7 should never re-do work the script already did, and the qa-agents invocation prompt explicitly excludes the structural layer's territory.
+If a check is script-doable, it belongs in the structural layer — not the adversarial layer. The qa-agents invocation prompt explicitly excludes the structural layer's territory.
 
-**User-defined checks from Phase 5.** The standard checks above are hard-coded into `verify_spec.py`. Process-specific checks the user adds in Phase 5 are *not* automatically runnable by the bundled script — they must either (a) be implementable inline by the agent reading the draft (semantic), or (b) be paired with a small extension script the user writes and the agent invokes. The skill makes this explicit in Phase 5 rather than promising automatic enforcement.
+**User-defined checks from Step 1's verification suite.** The standard checks are hard-coded into `verify_spec.py`. Process-specific checks the user adds are *not* automatically runnable by the bundled script — they must either (a) be implementable inline by the agent reading the draft (semantic), or (b) be paired with a small extension script the user writes and the agent invokes. The skill makes this explicit rather than promising automatic enforcement.
 
 ---
 
 ## Gate Mechanics
 
-Gates between phases enforce that each phase's work is complete enough to proceed. They run internally — the user only sees them when they fail and a fix is needed.
+Gates between steps enforce that each step's work is complete enough to proceed. Most run internally — the user only sees them when they fail and a fix is needed. **Step 2 Review is the exception: it is always user-visible, by design.**
 
 **Behavior on gate failure:**
 1. Identify the specific check that failed and what's missing
-2. Loop back to the precise sub-step (not the whole phase) to fill the gap
-3. After one iteration attempt, if the gap still isn't resolved, log it to "Assumptions and Open Questions" and proceed to the next phase. This is a **soft fail**.
+2. Loop back to the precise sub-step (not the whole step) to fill the gap
+3. After one iteration attempt, if the gap still isn't resolved, log it to "Assumptions and Open Questions" and proceed. This is a **soft fail**.
 
-**Soft-fail accumulation.** Track soft fails per session (one process-design invocation, end-to-end through Phase 8). Each soft fail emits one telemetry event regardless of whether the user later resolves it. At **the moment a 4th soft fail would be logged** — pause before logging it, surface the running list to the user, and ask: "Resolve some of these now, or accept reduced confidence and continue?"
+**Soft-fail accumulation.** Track soft fails per session. Each soft fail emits one telemetry event regardless of whether the user later resolves it. At **the moment a 4th soft fail would be logged** — pause before logging it, surface the running list to the user, and ask: "Resolve some of these now, or accept reduced confidence and continue?"
 
 If the user resolves any soft fails, decrement the count. If the user opts to continue, log the 4th soft fail and continue without re-pausing until **a 7th** would be logged (i.e., another threshold of 3). New soft fails generated by the surfacing dialogue itself do not count toward the threshold until the dialogue is closed.
-
-The threshold of 3 is a starting heuristic — Gate 6 alone has many sub-checks, and a single complex process can plausibly soft-fail two checks in early phases without indicating a quality problem. A fourth tells you the spec is starting to accumulate debt, which is the right moment to ask.
 
 **Script vs. agent for gate checks:**
 
 | Check type | Examples | Use |
 |---|---|---|
-| Structural | "All inputs named?", "Every step has owner?", "Mermaid parses?", "Successor IDs exist?" | Script (`verify_spec.py` and friends) |
+| Structural | "All inputs named?", "Every step has owner?", "Mermaid parses?", "Image freshness?" | Script (`verify_spec.py` and friends) |
 | Semantic | "Is this output concrete?", "Is this rule testable?", "Does this match user's intent?" | Agent (judgment required) |
 | Cross-referential | "Every step in procedure has metric assignment?", "Every input has tracked dimension?" | Script |
+| Decision | "Is this the procedure you intended?" (Step 2 Review), "Which is canonical, spec or source?" (Step 8) | **Human** |
 
-When script-doable, prefer scripts. They're faster, cheaper, deterministic, and auditable. When semantic judgment is required, the agent reasons directly. For mixed checks, run the script first and only escalate to the agent if the script passes.
+When script-doable, prefer scripts. They're faster, cheaper, deterministic, and auditable. When semantic judgment is required, the agent reasons directly. When a real design decision needs to be made, the user makes it.
 
 ---
 
-## Phase 1: Working Backwards
+## Step 0: Ingest *(conditional — only fires if user supplied a source description)*
 
-### 1.1 Output
+If the user uploaded a hand-drawn diagram, an existing flowchart, an old SKILL.md, or a description of a process they want hardened — ingest it before anchoring.
+
+### 0.1 Parse / transcribe
+
+- Text input: read directly.
+- Image input: transcribe nodes + edges + labels to text. Surface OCR uncertainty.
+- Markdown / SKILL.md / spec input: parse sections.
+
+### 0.2 Confirm
+
+Show the user what you parsed. Wait for confirmation before proceeding. Do not proceed on silence.
+
+### 0.3 Set the flag
+
+Record `step_0_fired = true` in session state. **Step 8 (Reconcile) consumes this flag.**
+
+### Step 0 exit gate
+
+| Check | Type | Method |
+|---|---|---|
+| Source description parsed without error | Structural | Script |
+| User explicitly confirmed transcription | Decision | Human |
+| step_0_fired flag set | Structural | Script |
+
+On fail: re-prompt for re-input or clarification. After one retry, surface to user — Step 0 cannot soft-fail (the source either ingests or doesn't).
+
+---
+
+## Step 1: Anchor
+
+The Working Backwards step. **Distributed deletion stance applied at every sub-step** — challenge every output, every input, every transition, every failure mode at the moment of addition. The deletion isn't a separate phase; it's a recurring constraint.
+
+### 1.1 (Step 1A) Output
 
 Ask, in order:
 
@@ -150,77 +213,253 @@ Ask, in order:
 2. **What does success look like? What does failure look like?**
 3. **Who or what consumes the output?**
 
-If the user can't articulate a concrete output, the process isn't ready to design. Help them sharpen.
+**Distributed deletion at 1A:** for each candidate output, ask "is this output necessary, or could the consumer get the same value from the inputs alone?" (P2 test). If output is bloated (multiple outputs when one suffices), challenge.
 
-### 1.2 Inputs
+**Concreteness rule:** the output noun must be (a) singular common noun, (b) consumer-namable. "Data" fails; "approval decision" passes. Order: name noun → name consumers → cross-check that consumers can name this exact noun.
+
+If the user can't articulate a concrete output, the process isn't ready to design. Help them sharpen — do not proceed to 1B.
+
+### 1.2 (Step 1B) Inputs
 
 For each input:
 1. What is it, where does it come from, what's its format?
-2. Is it controllable? (Critical — controllable inputs become the levers in Phase 2.)
+2. Is it controllable? (Critical — controllable inputs become the levers in Step 4.)
 3. What makes it valid? Invalid?
 4. What happens if it's missing?
 
-### 1.3 Constraints
+**Distributed deletion at 1B:** for each input, ask "is this input necessary, or could the process produce the same output without it?" If two inputs always vary together, can they collapse?
 
-- Timing, cost, quality bar.
+**Cross-input consistency check:** if Step 0 fired (existing description present), the existing description and the named build target must not contradict (e.g., description says "Lambda handler", target says "python script CLI"). Surface conflicts.
 
-### 1.4 Existing Process or Intuition
+### 1.3 (Step 1C) Transitions
 
-Now ask: *do you have a defined process for this, or do you do it intuitively?*
+Steps, decisions, gates, terminal states.
 
-When defined: walk through it, then mentally derive the minimum path from inputs to output yourself, then compare. Differences are signal — steps that don't connect → deletion candidates; missing connections → gap candidates.
+**Distributed deletion at 1C:** for each candidate transition, run the **trace test**: does it move a controllable input toward the output? If no, propose deletion. If yes, name which input it moves and how.
 
-When intuitive: derive the steps from inputs to output together.
+This is where most aggressive deletion happens — most premature transitions don't survive the trace test.
 
-### 1.5 Build Target
+### 1.4 (Step 1D) Failure modes
 
-Where does this spec end up? Claude Code, Claude Design, Python script, Lambda, manual, other. Determines the handoff format in Phase 8.
+Per-step failure + recovery.
 
-### Gate 1 (Working Backwards Complete)
+**Distributed deletion at 1D:** don't specify failures the process won't actually handle. A failure mode without a recovery plan is documentation theater.
+
+### Step 1 exit gate
 
 | Check | Type | Method |
 |---|---|---|
 | Output is a noun (not a verb) | Semantic | Agent |
-| Output is concrete and specific | Semantic | Agent |
+| Output is concrete and consumer-namable | Semantic | Agent |
 | At least one controllable input named | Structural | Script |
 | Every input has validation criteria | Structural | Script |
+| Cross-input consistency: source description doesn't contradict build target (if Step 0 fired) | Cross-ref | Agent |
 | Build target specified | Structural | Script |
+| Every transition passes the trace test | Semantic | Agent |
+| Every step has a named failure mode | Structural | Script |
 
-On fail: loop back to the sub-step (1.1, 1.2, etc.) that needs more work. After one retry, log gap as open question and proceed (soft fail).
+On fail: loop back to the sub-step (1A, 1B, etc.) that needs more work. After one retry, log gap as open question and proceed (soft fail).
 
 ---
 
-## Phase 2: Metrics Design
+## Step 1 Exit: Gap-Probe Fan-Out
 
-Design measurement before deletion. Run this phase even when the user is impatient.
+The constructive thought-partner phase. **This is the canonical sub-agent fan-out point** — the four sub-types are MECE and parallelizable.
 
-### 2.1 Output Metrics
+**Implementation:** spawn four `Task` tool invocations in parallel (single message, four tool calls):
+
+- **Agent A — Input stress-testing:** for each input, walk the four dimensions — missing, malformed, boundary, adversarial / unexpected combinations
+- **Agent B — Decision rule stress-testing:** for each branch — resolves on input alone? Two agents reach same branch? Boundary input? Ambiguous input?
+- **Agent C — Failure-mode probing:** for each step — fails partway? Detectable? Recoverable? Bounded retry? State left behind on abort?
+- **Agent D — Missing-step probing:** what does the process assume the user does manually? What does it assume already exists? What handoffs are implied? What observability is missing?
+
+Each agent receives the spec-in-progress (Step 1's outputs) and returns a list of gaps in its category. After all four return, run a **metrics-coverage probe**: with all stress-test results in hand, does every step's metric assignment hold up? Are there steps where measurement should be added based on what surfaced?
+
+If sub-agents are not available in the runtime, fall back to running the four sub-types sequentially in this same conversation. Log the mode in the Verification Record.
+
+### Per-agent completion gate
+
+A wholesale "Task tool unavailable → fall back" check is insufficient: fan-out can succeed for 3 of 4 sub-agents and fail silently for the 4th, leaving a coverage gap the agent doesn't notice. Instead:
+
+- **Per-agent valid-output check.** Each of the 4 must return a parseable, severity-tagged finding list.
+- **Partial fan-out → surgical fallback.** If only N of 4 returned valid output, retry the missing slots OR fall back to inline_simulation **for the missing slots only**, not the whole fan-out. Log the mixed mode (`task_fanout` for 3, `inline_simulation` for 1) explicitly.
+- **Two-or-more failures → full inline_simulation fallback.** Treat as broad runtime issue.
+
+**Mode logging.** Whichever execution mode runs, emit a `phase_complete` event with `phase: 1_exit` and `detail.mode` (`task_fanout` | `inline_simulation` | `partial_<count>_of_4`), and reflect the mode in the Verification Record as a top-level bullet:
+
+```markdown
+- Step 1-exit gap-probe mode: task_fanout
+```
+
+or
+
+```markdown
+- Step 1-exit gap-probe mode: inline_simulation
+```
+
+or
+
+```markdown
+- Step 1-exit gap-probe mode: partial_3_of_4 — Agent C timed out; ran inline as fallback
+```
+
+### Step 1 exit gate (gap-probe complete)
+
+| Check | Type | Method |
+|---|---|---|
+| All 4 stress-test sub-types performed | Structural | Script |
+| Every input stress-tested across the four dimensions | Cross-ref | Script |
+| Every decision rule stress-tested | Cross-ref | Script |
+| New gaps reflected in spec sections | Semantic | Agent |
+| Every sub-agent returned valid output (or fallback logged) | Structural | Script |
+
+On fail: loop back. Soft fail on retry.
+
+---
+
+## Step 2: Render
+
+**The flowchart is the primary deliverable.** Generate Mermaid → image file.
+
+### 2.1 Mermaid generation
+
+Use the diagram conventions from `templates/process-spec-template.md`. Annotation rules:
+
+**Step nodes (rectangular)** include the requirement owner inline:
+
+```
+Step4["Validate input<br/><sub><i>req: Sarah / breaks: corrupt data</i></sub>"]
+```
+
+**Gates (hexagons, `{{...}}`)** are exempt from owner annotation — gates' accountability lives in their named verification method (script / agent / human), not in a person.
+
+**Terminal states (stadium, `(...)`)** are exempt — they're end states, not requirements.
+
+### 2.2 Render to image
+
+Run `mmdc` (Mermaid CLI) to render the diagram to `<process-slug>.flowchart.png` next to the spec.
+
+If `mmdc` is not installed, fall back to Obsidian-renderable fenced markdown — write the Mermaid block to a separate `.md` file the user can open in Obsidian for native rendering. Log the fallback mode in the Verification Record.
+
+### 2.3 Post-render validation
+
+- Image file exists at the expected path
+- File size > 1 KB (catches truncated renders)
+- Exit code 0 from `mmdc`
+- Mermaid roundtrip parse: re-read the source from the spec, confirm it matches what rendered
+
+If any fails, surface to user, do not proceed.
+
+### 2.4 Foreground the result
+
+**Critical rule — the headline behavior of this step.** After rendering, the agent's response **MUST** include the image path on its own line at the top of the response, like:
+
+```
+**Flowchart:** /path/to/<process-slug>.flowchart.png
+
+Open this image in your viewer to review the procedure before we proceed to Step 2 Review (hard gate).
+```
+
+The flowchart is the primary deliverable. It must be findable in the agent's response without scrolling, without searching. **Burying the image path inside a long spec is a defect of this skill** — the user complaint that motivated the foregrounding requirement.
+
+### Step 2 Review — HARD GATE (user-visible, three explicit outcomes)
+
+The user reviews the rendered flowchart and replies with one of three outcomes:
+
+| Outcome | Agent action |
+|---|---|
+| `confirm` | Proceed to Step 3 (Final pruning) |
+| `reject + <step-name>` (named target) | Loop to user-named step (e.g., `reject + Step 1C: I want different transitions`) |
+| `reject` (silent — no named target) | Default to Step 1A (Output anchored) — most upstream restart |
+
+**Partial-confirm handling.** "Yes but…" answers are treated as `reject + <step the user names in the clarification>`. Ambiguous "kind of" or "mostly" replies are surfaced back to the user with the three-outcome menu — do not infer.
+
+**Ambiguous-reply rule.** If the user's reply doesn't unambiguously map to one of the three outcomes, do NOT guess. Re-prompt with the three-outcome menu and an explicit "I read your reply as X — confirm or correct."
+
+This gate is the user's first reality check on the design. Skipping it (assuming "they probably mean confirm") defeats the purpose of hoisting render to Step 2.
+
+---
+
+## Step 3: Final Pruning
+
+**Concentrated Elon pass, post-visual.** With the flowchart rendered and reviewed, bloat that wasn't visible in prose now becomes obvious. Run the algorithm one more time.
+
+See `references/elon-algorithm.md` for full operating principles.
+
+### 3.1 Question every surviving requirement
+
+Three tests per step:
+- **Trace test:** does this step move a controllable input toward the output?
+- **Owner test:** who decided this needs to happen? What breaks if removed?
+- **Visualization test (new — only available post-render):** does this node make the flowchart denser without making it more useful?
+
+Mark each step ✅ / 🚩 / ❓.
+
+### 3.2 Delete
+
+For each 🚩, propose deletion. Direct language: "I'm proposing to delete step N." Name the metrics consequence (even though metrics aren't yet wired — reason about what *would* be measured if it were).
+
+The bias is aggressive deletion. Track add-back ratio (steps re-added during review / steps proposed for deletion) as a sanity check — target ~10%, hard ceiling ≥ 0.30. Boundary handling:
+- Add-back ratio exactly 0.30 → triggers (use ≥, not strict >).
+- Zero deletions proposed → ratio is 0 by convention (vacuous, gate passes).
+- Zero deletions accepted but proposals were made → ratio is 0 by convention; the proposing-but-not-accepting itself warrants user reflection.
+
+### 3.3 Simplify
+
+Look for redundant steps, dead branches, no-op transitions, beneficial re-orderings. Each simplification proposal accounts for visualization impact (does the diagram get cleaner?).
+
+### 3.4 Parallelize
+
+For each step or group: MECE? Shared state? Join points? Coordination cost vs. cycle-time gain?
+
+### Step 3 exit gate
+
+| Check | Type | Method |
+|---|---|---|
+| All deletion proposals explicitly accepted/rejected | Structural | Script |
+| Metrics consequence named for each deletion | Cross-ref | Script |
+| Every surviving step has named owner and failure mode | Cross-ref | Script |
+| Add-back ratio ≤ 0.30 (or vacuous if no deletions) | Numerical | Script |
+
+On fail: loop back. Soft fail on retry.
+
+---
+
+## Step 4: Metrics Design
+
+Now the procedure is settled, design measurement.
+
+### 4.1 Output Metrics
 
 Restate the success criterion as a measurable metric. *"Output is correct"* is not a metric; *"output quality scored ≥4/5 by reviewer"* is.
 
-### 2.2 Controllable Input Metrics
+Specifically include `post_handoff_clarification_rate` if the build target is an autonomous agent — % of build runs returning with spec questions, rolling 20-run window. **This is the headline output metric for any agent-built process.**
+
+### 4.2 Controllable Input Metrics
 
 For each controllable input, name dimensions worth tracking (quality, volume, source, recency). Instrument every controllable input even when uncertain which will matter — the point is to find out.
 
 Ask: *"After 50 runs, what would let you rank controllable inputs by how much each affected output quality?"* If the answer is "nothing currently," design that capability in here.
 
-Note to user: expect input metrics to evolve. The first version is rarely the right one. The Metrics Review Plan (later in the spec, implemented via `dmaic`) is the mechanism by which they refine over time.
+Note to user: expect input metrics to evolve. The first version is rarely the right one. The Metrics Review Plan (Step 5, implemented via `dmaic`) is the mechanism by which they refine over time.
 
-### 2.3 Agent Performance Metrics
+### 4.3 Agent Performance Metrics
 
 Every step emits the standard set: latency, retry count, confidence/uncertainty, clarification requests, failures, unexpected paths. Mandatory.
 
 For specific high-risk steps, additional signals beyond the standard set may be specified.
 
-### 2.4 Process Health Metrics
+### 4.4 Process Health Metrics
 
-Cycle time, cost per run, throughput, parallelization efficiency.
+Cycle time, cost per run, throughput, parallelization efficiency, mode-of-execution distribution (which fan-out modes ran).
 
-### 2.5 Anecdote and Exception Capture
+### 4.5 Anecdote and Exception Capture
 
 Where do specific case logs live for review beyond aggregate metrics? What conditions trigger detailed logging?
 
-### Gate 2 (Metrics Map Complete)
+For this skill specifically: log every Step 2 Review reject, every Step 6 blocking-assertion failure, every post-handoff clarification, every session with ≥3 soft fails.
+
+### Step 4 exit gate
 
 | Check | Type | Method |
 |---|---|---|
@@ -233,257 +472,139 @@ On fail: loop back to the relevant sub-step. Soft fail on retry.
 
 ---
 
-## Phase 3: Apply the Algorithm
+## Step 5: Review Cadence + DMAIC + Telemetry Destination
 
-The Metrics Map from Phase 2 is now a constraint on deletion. See `references/elon-algorithm.md` for the full operating principles.
+### 5.1 Cadence
 
-### 3.1 Question Every Requirement
+How often does the metrics review run? Common patterns: monthly, on-accumulation-of-N-runs, on-rare-failure-event.
 
-Three tests per step:
-- **Trace test**: does this step move a controllable input toward the output?
-- **Owner test**: who decided this needs to happen? What breaks if removed?
-- **Metrics test**: what does this step emit from the Metrics Map? Where does that signal go if deleted?
+### 5.2 Quorum
 
-Mark each step ✅ / 🚩 / ❓.
+Who reviews? At minimum, the process owner + one downstream user.
 
-### 3.2 Delete
+### 5.3 Trigger conditions
 
-For each 🚩, propose deletion. Direct language: "I'm proposing to delete step N." Name the metrics consequence explicitly.
+Beyond cadence, what fires an out-of-cycle review? E.g., a critical-severity finding repeating across two runs, post_handoff_clarification_rate exceeding threshold.
 
-The bias is aggressive deletion. Track add-back ratio (steps re-added during review / steps proposed for deletion) as a sanity check — target ~10%, hard ceiling 30%. If no steps were proposed for deletion, the ratio is 0 by convention (vacuous), the gate passes, and the algorithm phase exits with a note that the design proposed no deletions — which itself warrants user reflection.
+### 5.4 Telemetry destination
 
-### 3.3 Simplify
+Where does session telemetry land? Default: `$PROCESS_DESIGN_LOG_DIR/<YYYY-MM-DD>-<process-slug>.jsonl`, falling back to `~/.claude/process-design-sessions/` when the env var is unset. The skill never hardcodes vault- or environment-specific paths.
 
-Look for redundant steps, dead branches, no-op transitions, beneficial re-orderings. Each simplification proposal accounts for metrics impact.
-
-### 3.4 Parallelize
-
-For each step or group: MECE? Shared state? Join points? Coordination cost vs. cycle-time gain?
-
-### Gate 3 (Algorithm Phase Complete)
+### Step 5 exit gate
 
 | Check | Type | Method |
 |---|---|---|
-| All deletion proposals explicitly accepted/rejected | Structural | Script |
-| Metrics impact named for each deletion | Cross-ref | Script |
-| Every surviving step has named owner and failure mode | Cross-ref | Script |
-| Add-back ratio ≤ 0.30 (or vacuous if no deletions) | Numerical | Script |
-
-On fail: loop back. Soft fail on retry.
+| Cadence specified | Structural | Script |
+| Trigger conditions named | Structural | Script |
+| Telemetry destination specified or defaulted | Structural | Script |
 
 ---
 
-## Phase 4: Probe for Gaps
+## Step 6: Verify
 
-The constructive thought-partner phase. **Phase 4 is the canonical sub-agent fan-out point** — the four sub-types are MECE and parallelizable.
+Two layers, non-overlapping (see boundary table at top).
 
-**Implementation:** spawn four `Task` tool invocations in parallel (single message, four tool calls):
+### 6.1 Structural — `verify_spec.py`
 
-- **Agent A — Input stress-testing (4.1):** for each input, walk the four dimensions — missing, malformed, boundary, adversarial / unexpected combinations
-- **Agent B — Decision rule stress-testing (4.2):** for each branch — resolves on input alone? Two agents reach same branch? Boundary input? Ambiguous input?
-- **Agent C — Failure-mode probing (4.3):** for each step — fails partway? Detectable? Recoverable? Bounded retry? State left behind on abort?
-- **Agent D — Missing-step probing (4.4):** what does the process assume the user does manually? What does it assume already exists? What handoffs are implied? What observability is missing?
+Run `python scripts/verify_spec.py --final <path-to-spec>`. The script runs every script-doable check from the verification suite and exits non-zero on any blocking failure.
 
-Each agent receives the spec-in-progress (Phases 1–3 outputs) and returns a list of gaps in its category. After all four return, run **4.5 — Metrics Coverage Probing**: with all stress-test results in hand, does every step's metric assignment hold up? Are there steps where measurement should be added based on what the four agents surfaced?
+**Exit codes:**
+- `0` = verdict-ran-and-passed (all blocking assertions pass)
+- `1` = verdict-ran-and-failed (one or more blocking assertions failed)
+- `≥2` = uncaught exception or bad invocation (treat as **hard fail**, NOT pass)
 
-If sub-agents are not available in the runtime, fall back to running 4.1–4.4 sequentially in this same conversation.
+**`image_freshness` assertion** — when an image file (`<process-slug>.flowchart.png` or `.svg`) exists alongside the spec, verify image mtime ≥ spec mtime. If the spec was edited after Step 2's render (e.g., during Step 3 pruning that altered the diagram), re-render before re-running other assertions. If no image is found, the assertion is vacuous-pass.
 
-**Mode logging.** Whichever execution mode runs — `task_fanout` (four parallel Task subagents) or `inline_simulation` (sequential, same context) — emit a `phase_complete` event with `phase: 4` and `detail.mode: task_fanout | inline_simulation` (single canonical telemetry shape), and reflect the mode in the Verification Record as a **top-level bullet** (the verifier requires the bullet form, not blockquote prose):
+**Structured pass summary.** `verify_spec.py --final` prints `PASSED: N/N final blocking assertions` (or `FAILED: M/N` with the failed-assertion list) so the count is verifiable from output, not just inferred from the exit code. The eval suite asserts on this count line; paired drift between assertion count and eval expectations is a defect.
 
-```markdown
-- Phase 4 mode: task_fanout
-```
+### 6.2 Adversarial / Semantic — `Skill(qa-agents)`
 
-or
+Step 6 catches what the structural layer cannot: untestable rules, ambiguous decisions, missing edge cases, internal contradictions in the prose, weak metric definitions.
 
-```markdown
-- Phase 4 mode: inline_simulation
-```
-
-Optional context can follow on the same line after the token (e.g., `- Phase 4 mode: inline_simulation — Task tool unavailable; sub-types ran sequentially`), as long as the line contains exactly one of `task_fanout` or `inline_simulation`.
-
-### Gate 4 (Gap Probing Complete)
-
-The four input stress-test dimensions are: **missing**, **malformed**, **boundary**, **adversarial / unexpected combinations** (the last collapses 4.1's open-ended fifth question into the adversarial bucket).
-
-| Check | Type | Method |
-|---|---|---|
-| All 4 stress-test sub-types performed (4.1–4.4) | Structural | Script |
-| Every input stress-tested across the four named dimensions | Cross-ref | Script |
-| Every decision rule stress-tested across the four 4.2 questions | Cross-ref | Script |
-| New gaps from 4.1–4.4 reflected in spec sections | Semantic | Agent |
-
-On fail: loop back. Soft fail on retry.
-
----
-
-## Phase 5: Verification Suite
-
-Apply the TDD principle: define what makes the spec complete and correct *before* drafting. See `references/test-writing.md`.
-
-### 5.1 Diagram Type Selection
-
-| Process shape | Diagram type |
-|---|---|
-| Branches, loops, no persistent state | `flowchart` (default) |
-| Things dwell in named states, react to events | `stateDiagram-v2` |
-| Multiple actors exchanging messages | `sequenceDiagram` |
-| Concurrent processes with explicit synchronization | `flowchart` with subgraphs |
-
-State the choice and reason explicitly.
-
-### 5.2 Define the Verification Suite
-
-The set of checks the spec must pass. Many fall out of `references/spec-principles.md`:
-
-- Every step has named requirement owner
-- Every decision rule testable on input alone
-- Every input has documented validation
-- Metrics Map has entries in all four categories
-- Every controllable input has at least one tracked dimension
-- Every diagram node displays its owner annotation
-- Every gate in the spec has a named verification method
-- Successor step IDs all exist
-- At least one terminal state is reachable
-
-Process-specific checks may be added based on what surfaced in Phases 1–4.
-
-For each check, classify as script-doable or agent-required. Gate 6 routes to `verify_spec.py` for the script-doable set; the agent-required subset is checked inline during Phase 6.
-
-### Gate 5 (Verification Suite Complete)
-
-| Check | Type | Method |
-|---|---|---|
-| Diagram type chosen with explicit justification | Semantic | Agent |
-| Verification suite enumerates checks | Structural | Script |
-| Each check classified as script or agent | Structural | Script |
-
-On fail: loop back to the relevant sub-step (5.1 or 5.2). Soft fail on retry — log to Assumptions and proceed.
-
----
-
-## Phase 6: Draft
-
-Use `templates/process-spec-template.md` as the scaffold. Build the spec to pass the verification suite from Phase 5.
-
-### Mid-session checkpointing
-
-**Write the draft to disk as soon as Phase 6 completes**, with `status: draft` in frontmatter. Long sessions can crash; checkpointing prevents loss. The status field flips to `verified` only after Phase 7 passes (see Phase 7 below).
-
-**Path and filename rules.** Default filename: `<process-slug>.process-spec.md` where `<process-slug>` is a kebab-case derivation of the process name from Phase 1.1 (lowercase, alphanumerics + hyphens). Default directory: the user's current working directory at the time the skill was invoked. If a file with the same name already exists, do not overwrite — surface the existing path, show the user what's already there, and ask whether to (a) resume that draft, (b) write to a sibling path with a numeric suffix, or (c) name a different path. Do not write silently.
-
-### Diagram Annotation
-
-Every **step node** (rectangular, the actions in the procedure) includes the requirement owner inline:
-
-```
-Step4["Validate input<br/><sub><i>req: Sarah / breaks: corrupt data</i></sub>"]
-```
-
-**Gates** appear as explicit decision nodes (hexagon shape) and are **exempt from the owner annotation rule** — a gate's accountability lives in its named verification method (script / agent / human), not in a person. Terminal-state nodes (stadium shape) are also exempt — they represent end states, not requirements.
-
-```
-Gate1{{"GATE: input validation passes"}}
-Gate1 -->|pass| NextStep
-Gate1 -->|fail| Retry
-```
-
-### Drafting Principles
-
-- **Atomic claims.** Every decision rule, edge case, successor, and metric is one verifiable statement.
-- **Explicit successors.** Every step names possible next steps with testable conditions.
-- **Metrics referenced, not restated.** The procedure references "standard performance metrics" and named additions; full definitions live in the Metrics Map.
-- **No verifier-workaround commentary in the spec body.** If a `verify_spec.py` check appears to fail for a regex/parsing quirk rather than a real design defect, do **not** reshape the spec to dodge the bug. The spec is the build artifact; workaround commentary corrupts it. Instead: **surface the script defect to the user immediately** with a one-line description and the failing check, log it to `session-notes.md`, and either (a) fix the script before continuing the session, or (b) treat the failure as a regular soft fail (counted toward the threshold-3 accumulator). There is no carve-out — the agent cannot self-classify a failure as "script bug" to dodge accountability. If verifier noise is genuinely producing many soft fails in a session, the user surfacing at threshold-3 is the right moment to triage which are real design gaps and which are script bugs needing patch.
-
-### Gate 6 (Draft Complete — deterministic layer)
-
-Run `scripts/verify_spec.py <path-to-draft>`. The script runs every script-doable check from Phase 5's suite and exits non-zero on any blocking failure. Agent-required checks from the suite are evaluated inline by reading the draft.
-
-Gate 6 catches **structure**: parse failures, missing fields, broken references, unreachable terminals. It is deterministic — the same draft always passes or fails the same way.
-
-On fail: fix the specific check failure. Soft fail on retry — log to Assumptions.
-
----
-
-## Phase 7: Verify Adversarially (delegates to qa-agents)
-
-Phase 7 catches what Gate 6 cannot: untestable rules, ambiguous decisions, missing edge cases, internal contradictions in the prose, weak metric definitions. It is adversarial-semantic. **Reachability and unbounded-loop detection live in Gate 6**, not here — qa-agents must not be asked to re-do the structural layer's work.
-
-### Invocation contract
+#### Invocation contract
 
 Invoke the bundled qa-agents skill via the Skill tool. Pass a single args string of the form:
 
 ```
-artifact=<absolute-path-to-draft-spec.md> rubric=process-spec scope="semantic only — Gate 6 covers structure, reachability, and loops. Find: untestable decision rules, ambiguous criteria, missing edge cases, weak or vanity metrics, internal contradictions in the prose, unmotivated surviving steps, gaps the structure cannot see."
+artifact=<absolute-path-to-draft-spec.md> rubric=process-spec scope="semantic only — Step 6 structural layer covers structure, reachability, loops, and image freshness. Find: untestable decision rules, ambiguous criteria, missing edge cases, weak or vanity metrics, internal contradictions in the prose, unmotivated surviving steps, gaps the structure cannot see."
 ```
 
-If the qa-agents skill ships a `process-spec` rubric, it will use that; otherwise it falls back to its `document` rubric. The skill handles the finder/auditor/referee orchestration internally and returns a synthesized markdown report containing:
+If qa-agents ships a `process-spec` rubric, it will use that; otherwise it falls back to its `document` rubric. The skill handles the finder/auditor/referee orchestration internally and returns a synthesized markdown report containing:
 
 - A list of confirmed findings, each tagged with **finding type** (one of: `output`, `metric`, `step-deletion`, `edge-case`, `verification-check`, `drafting`, `unbounded-loop`, `internal-contradiction`, `metric-impact`, `other`)
 - Severity (low / medium / critical, mapped from +1 / +5 / +10)
 - Auditor's borderline-flag list (low-confidence accepted findings)
 - A score line (Finder total, Auditor net, Referee net)
 
-**Do not re-implement the three-agent pattern here when qa-agents is available.**
+**Do not re-implement the three-agent pattern when qa-agents is available.**
 
-**When qa-agents is unreachable.** Some runtimes lack the Skill tool or the Task subagent capability qa-agents requires. In that case, simulate the three-agent pattern inline using the rubric in this SKILL.md. **The simulation is structurally similar but adversarially weaker** — the agent doing the finding, auditing, and refereeing shares context with the agent that drafted the spec, so isolation is partial. The skill must still complete and produce its spec. But:
+#### When qa-agents is unreachable
 
-- Telemetry: emit a `phase_complete` event with `phase: 7` and `detail.mode: inline_simulation` (the real path emits the same event with `detail.mode: skill_invocation`). One canonical event shape — see the Telemetry section.
+Some runtimes lack the Skill tool or the Task subagent capability qa-agents requires. Simulate the three-agent pattern inline using the rubric in this SKILL.md. **The simulation is structurally similar but adversarially weaker** — the agent doing the finding, auditing, and refereeing shares context with the agent that drafted the spec, so isolation is partial. The skill must still complete and produce its spec. But:
+
+- Telemetry: emit a `phase_complete` event with `phase: 6` and `detail.mode: inline_simulation` (real path: `skill_invocation`).
 - Add an explicit line to the spec's Verification Record:
 
-  > **Phase 7 simulation note:** qa-agents skill not reachable; finder/auditor/referee simulated inline. Adversarial isolation collapsed. Treat findings as lower-confidence than a real qa-agents pass; re-run Phase 7 against this spec from a runtime with subagent capability before treating the spec as production-grade.
+  > **Phase 7 simulation note:** qa-agents skill not reachable; finder/auditor/referee simulated inline. Adversarial isolation collapsed. Treat findings as lower-confidence than a real qa-agents pass; re-run from a runtime with subagent capability before treating the spec as production-grade.
 
-A downstream reviewer reading the spec must be able to see this without trusting the session notes alone — the spec is the build artifact, and confidence in its verification must be visible at the artifact level.
+A downstream reviewer reading the spec must be able to see this without trusting the session notes alone.
 
-### Routing real findings back into the design loop
+#### Routing real findings back into the design loop
 
-For each confirmed finding, route by **finding type** — not by your reading of the prose. **Routing is binding when Phase 7 ran in `skill_invocation` mode** (real qa-agents, real adversarial isolation) — the wrong phase wastes a retry and risks layering the fix on top of broken upstream work. **In `inline_simulation` mode the routing weakens** (see "Inline-simulation lowers confidence in routing" below) — Auditor disprovals become advisory and borderline findings route to Assumptions instead of upstream phases.
+For each confirmed finding, route by **finding type**:
 
 | Finding type | Loop back to |
 |---|---|
-| `output` — output unclear, success criterion ambiguous, build target wrong | Phase 1 (Working Backwards) |
-| `metric` — metric gap, untracked controllable input, unreachable measurement, vanity metric | Phase 2 (Metrics Design) |
-| `metric-impact` — deletion proposal whose metrics consequence was not named or named wrong | Phase 3 (Algorithm) |
-| `step-deletion` — surviving step that should be deleted, undeleted step without justification | Phase 3 (Algorithm) |
-| `edge-case` — missing edge case, untested input class, undetectable failure mode | Phase 4 (Gap Probing) |
-| `verification-check` — verification suite check missing or classification wrong | Phase 5 (Verification Suite) |
-| `drafting` — typo, broken reference, missing template field, restated-not-referenced metric | Phase 6 (re-draft only, no re-design) |
-| `unbounded-loop` — Gate 6 should have caught; if Phase 7 finds one, treat as Gate 6 escape and patch the script | Phase 6 + open issue against `verify_spec.py` |
-| `internal-contradiction` — prose says X here, Y there | The earlier of the two contradicting phases (treat the later as the inheritor) |
-| `other` — finding doesn't fit | Surface to user — judgment call needed |
+| `output` | Step 1A (Output anchored) |
+| `metric` | Step 4 (Metrics design) |
+| `metric-impact` (deletion's metrics consequence wrong/missing) | Step 3 (Final pruning) |
+| `step-deletion` | Step 3 (Final pruning) |
+| `edge-case` | Step 1 exit (Gap-probe) |
+| `verification-check` | Step 1 (verification suite — re-derive in Step 1) |
+| `drafting` (typo, broken ref) | Re-draft in place; no loop back |
+| `unbounded-loop` (Gate escape) | Re-draft + open issue against `verify_spec.py` |
+| `internal-contradiction` | Earlier of the two contradicting steps (treat the later as inheritor) |
+| `other` | Surface to user — judgment call |
 
-**Inline-simulation lowers confidence in routing.** When Phase 7 ran in `inline_simulation` mode, the Auditor shares context with the drafter. That makes false negatives more likely (an Auditor disprovals a real finding using the drafter's own reasoning). Two adjustments apply only in inline-simulation mode:
+**Inline-simulation lowers confidence in routing.** Auditor disprovals become **advisory, not authoritative**. Borderline findings route to "Assumptions and Open Questions" with `inline_simulation_borderline: true`, not to upstream steps.
 
-1. **Auditor disprovals are advisory, not authoritative.** Treat any Finder finding the inline Auditor "disproved" as a borderline finding the user should examine before dismissal. Surface it.
-2. **Borderline findings route to Assumptions, not upstream phases.** A medium-severity finding the inline simulator marked borderline should be logged to "Assumptions and Open Questions" with `inline_simulation_borderline: true`, not loop back to Phase 1–5. Re-run Phase 7 from a real-isolation runtime later to resolve.
+After a fix, always re-run the structural layer (`verify_spec.py`). Re-invoke qa-agents (full Step 6 adversarial pass) under any of these conditions:
 
-In `skill_invocation` mode the routing table applies as-is.
-
-After a fix, always re-run Gate 6 (structural layer must re-pass on any draft mutation). Re-invoke qa-agents (full Phase 7) under any of these conditions:
-
-1. The fix looped back to Phase 1, 2, 3, 4, or 5 (the upstream phase changed substantive design content; the resulting draft is materially different).
-2. Two or more findings were confirmed in the prior qa-agents pass (multiple sections affected, even if each fix is small).
+1. The fix looped back to Step 1, 3, or 4 (substantive design content changed).
+2. Two or more findings were confirmed in the prior qa-agents pass.
 3. A single finding's fix touched more than one section of the spec.
 
-**The only case where qa-agents need not re-run:** a single `drafting`-typed finding (typo, broken reference, missing template field) confined to one section. Anything else gets re-validated. The cost of an extra qa-agents pass is small; the cost of shipping an unverified design change is large.
+The only case where qa-agents need not re-run: a single `drafting`-typed finding confined to one section.
 
-### When findings are false positives
+### Step 6 exit gate (Verify complete)
 
-In `skill_invocation` mode: Auditor disproved → no spec change. Note the finding for skill improvement (optional: log to telemetry). When the referee disagrees with both finder and auditor, surface to the user — judgment call needed.
-
-In `inline_simulation` mode: Auditor disprovals are **advisory** (because adversarial isolation collapsed). No spec change happens automatically, but the finding *is* surfaced to the user as borderline at the end of Phase 7 with the note "Inline-simulation Auditor disproved this — please confirm before treating as a false positive." The user, not the inline simulator, has the last word.
+| Check | Type | Method |
+|---|---|---|
+| `verify_spec.py --final` exits 0 | Structural | Script |
+| Structured PASSED count line present in output | Structural | Script |
+| qa-agents pass logged in Verification Record (or inline_simulation note + borderline list) | Structural | Script |
+| All real (non-borderline) findings resolved or surfaced to Assumptions | Semantic | Agent |
 
 ### Promotion
 
-After all real gaps are fixed (or logged as Assumptions on soft fail), update the spec frontmatter from `status: draft` to `status: verified` and proceed to Phase 8.
+After all real gaps are fixed (or logged as Assumptions on soft fail), update the spec frontmatter from `status: draft` to `status: verified` and proceed to Step 7.
 
-**Soft-failed gaps and Phase 8.** Phase 8's Final Verification Assertions are blocking on a verified spec. If a soft-failed gap from any earlier phase corresponds to a Phase 8 blocking assertion (e.g., "Edge case section non-empty" — soft-failed at Phase 4), promotion to `verified` is **not** allowed; the spec stays at `status: draft` and surfaces to the user with the remaining-blockers list. Soft fail trades quality for momentum within the design loop, but it does not let an incomplete spec escape Phase 8. The user's choices at this point: resolve the blocker, or downgrade scope until Phase 8's assertion is honestly satisfiable. (See "Phase 8 → loop-back" below.)
+**Soft-failed gaps and Step 7.** Step 7's Final Verification Assertions are blocking on a verified spec. If a soft-failed gap from any earlier step corresponds to a Step 7 blocking assertion, promotion to `verified` is **not** allowed; the spec stays at `status: draft` and surfaces to the user with the remaining-blockers list.
 
 ---
 
-## Phase 8: Build Handoff
+## Step 7: Handoff
 
 Generate the prompt the user pastes into the build agent. **Implementation-agnostic** — describe architectural requirements, not implementation mechanisms. `scripts/render_handoff.py` produces this from the verified spec given a `--target` flag.
+
+### Foregrounding (still applies)
+
+The agent's response surfaces:
+- Image path on its own line (carried over from Step 2)
+- Spec path on its own line
+- Build prompt or path-to-build-prompt on its own line
+
+These three artifacts are the deliverables. Foreground them.
 
 ### Architectural Requirements (Always)
 
@@ -504,6 +625,7 @@ Every build prompt includes:
 | Lambda function | Middleware, CloudWatch Metrics, X-Ray |
 | n8n / Zapier | Built-in execution data, custom webhooks |
 | Arbitrary code | Structured logging library, OpenTelemetry |
+| `existing-skill-audit-and-dmaic-feed` | Audit existing skill against spec, surface drift, run DMAIC review next |
 
 The skill names examples; the build agent picks. Prompt template:
 
@@ -511,66 +633,112 @@ The skill names examples; the build agent picks. Prompt template:
 
 ### Final Verification Assertions
 
-Run by `verify_spec.py --final` after Phase 7 has promoted the spec to `status: verified`. **All assertions are blocking.** If any fails, the agent (a) demotes the frontmatter back to `status: draft`, (b) loops back per the table below, (c) re-runs the affected gate after the fix, and (d) re-promotes only on a clean re-run. Do not present the artifact as complete with status `verified` while any blocking assertion fails.
+Run by `verify_spec.py --final` after Step 6 has promoted the spec to `status: verified`. **All assertions are blocking.** If any fails, the agent (a) demotes the frontmatter back to `status: draft`, (b) loops back per the table below, (c) re-runs the affected gate after the fix, and (d) re-promotes only on a clean re-run. Do not present the artifact as complete with status `verified` while any blocking assertion fails.
 
-**Single canonical assertion → loop-back table.** Every blocking assertion is enumerated here with both its blocking property and its loop-back target. Adding a row to this table is the only way a new blocking check enters the spec; `verify_spec.py --final` is kept in sync with this table.
+**Single canonical assertion → loop-back table.** Every blocking assertion is enumerated here with both its blocking property and its loop-back target. Adding a row to this table is the only way a new blocking check enters the spec.
 
 | Assertion | Blocking | Loop back to on fail |
 |---|---|---|
-| Spec file written | Yes | Phase 6 (write) |
-| YAML frontmatter parses | Yes | Phase 6 (drafting fix) |
-| Mermaid block parses | Yes | Phase 6 (drafting fix) |
-| All step ID references resolve | Yes | Phase 6 (drafting fix) |
-| Every step has requirement owner | Yes | Phase 6 (drafting fix) |
-| Every step node displays owner annotation in diagram | Yes | Phase 6 (drafting fix) |
-| Every Procedure step ID appears in the diagram | Yes | Phase 6 (drafting fix) |
-| Every decision rule has a Criterion | Yes | Phase 1 if rule missing; Phase 6 if Criterion line missing |
-| Every input has documented validation | Yes | Phase 1 if validation missing; Phase 6 if line missing |
-| Metrics Map covers all four categories | Yes | Phase 2 |
-| Every controllable input has ≥1 tracked dimension | Yes | Phase 2 |
-| Every step references the standard performance metrics block | Yes | Phase 6 (drafting fix) |
-| Metrics Review Plan names cadence and triggers | Yes | Phase 2 (extends to Review Plan) |
-| Every Gate names a verification Method | Yes | Phase 5 |
-| At least one terminal state reachable | Yes | Phase 6 + Gate 6 escape (structural layer should have caught — patch `verify_spec.py`) |
-| No unreachable nodes | Yes | Phase 6 (drafting fix) |
-| No unbounded loops | Yes | Phase 6 (drafting fix) — add an exit edge |
-| Edge Case section non-empty with content (not just placeholder rows) | Yes | Phase 4 |
-| Build Notes section non-empty | Yes | Phase 6 (drafting fix) |
-| qa-agents verification logged in Verification Record (no placeholder) | Yes | Phase 7 (re-run; see Promotion above) |
-| Phase 4 mode named in Verification Record | Yes | Phase 6 (drafting fix — add the mode line) |
-| Phase 7 mode named in Verification Record | Yes | Phase 6 (drafting fix — add the mode line) |
-| Phase 7 inline_simulation: Simulation Note present | Yes (only if Phase 7 mode = inline_simulation) | Phase 6 (drafting fix — add the Simulation Note) |
-| Inputs section parses into ≥1 input declaration when non-empty | Yes | Phase 6 (drafting fix — bullet syntax must be `- **name**: …` at column 0) |
+| Spec file written | Yes | Step 6 (drafting fix) |
+| YAML frontmatter parses | Yes | Step 6 (drafting fix) |
+| Mermaid block parses | Yes | Step 6 (drafting fix) |
+| All step ID references resolve | Yes | Step 6 (drafting fix) |
+| Every step has requirement owner | Yes | Step 6 (drafting fix) |
+| Every step node displays owner annotation in diagram | Yes | Step 6 (drafting fix) |
+| Every Procedure step ID appears in the diagram | Yes | Step 6 (drafting fix) |
+| Every decision rule has a Criterion | Yes | Step 1 if rule missing; Step 6 if Criterion line missing |
+| Every input has documented validation | Yes | Step 1 if validation missing; Step 6 if line missing |
+| Metrics Map covers all four categories | Yes | Step 4 |
+| Every controllable input has ≥1 tracked dimension | Yes | Step 4 |
+| Every step references the standard performance metrics block | Yes | Step 6 (drafting fix) |
+| Metrics Review Plan names cadence and triggers | Yes | Step 5 |
+| Every Gate names a verification Method | Yes | Step 1 (verification suite) |
+| At least one terminal state reachable | Yes | Step 6 + Gate escape (patch `verify_spec.py`) |
+| No unreachable nodes | Yes | Step 6 (drafting fix) |
+| No unbounded loops | Yes | Step 6 (drafting fix — add an exit edge) |
+| **`image_freshness` (image mtime ≥ spec mtime when image present)** | Yes | Step 2 (re-render) |
+| Edge Case section non-empty with content (not just placeholder rows) | Yes | Step 1 exit (gap-probe) |
+| Build Notes section non-empty | Yes | Step 6 (drafting fix) |
+| qa-agents verification logged in Verification Record (no placeholder) | Yes | Step 6 (re-run) |
+| Step 1-exit fan-out mode named in Verification Record | Yes | Step 6 (drafting fix — add the mode line) |
+| Step 6 mode named in Verification Record | Yes | Step 6 (drafting fix — add the mode line) |
+| Step 6 inline_simulation: Simulation Note present | Yes (only if Step 6 mode = inline_simulation) | Step 6 (drafting fix — add the Simulation Note) |
+| Inputs section parses into ≥1 input declaration when non-empty | Yes | Step 6 (drafting fix — bullet syntax must be `- **name**: …` at column 0) |
 
-`verify_spec.py --final` is the executable definition of this table. SKILL.md and the script must change together — drift is a defect.
+`verify_spec.py --final` is the executable definition of this table. **Paired drift discipline:** SKILL.md, `verify_spec.py --final`, AND the eval expectations naming the assertion count must change in the same commit. Drift between any of the three is a defect — it means the spec, the verifier, and the regression tests have desynchronized about what's actually blocking. (This is the same principle the skill applies internally between SKILL.md and the script; just extends it to evals.)
 
 If a blocking assertion fails, do not present the artifact as complete. Fix and re-verify.
 
 ---
 
+## Step 8: Reconcile *(conditional — only fires if step_0_fired)*
+
+If Step 0 ingested an existing source description, the produced spec almost certainly diverges from the source in places. Surface drift before declaring the session complete.
+
+### 8.1 Diff
+
+Compare each section of the produced spec against the source description. Drift candidates:
+
+- Procedure shape (steps added, removed, reordered)
+- Inputs (added, removed, validation tightened/loosened)
+- Failure modes
+- Metric definitions
+- Gate behavior
+
+### 8.2 Surface drift
+
+Present a drift table to the user — for each item: what the spec says, what the source says, severity.
+
+### 8.3 User names canonical
+
+For each drift item, the user names which is canonical:
+- **Spec** (source needs to be rewritten to match)
+- **Source** (spec is the one that needs revision — loop back to relevant earlier step)
+- **Merge** (some hybrid, with user spelling out which parts come from which)
+
+### 8.4 If user refuses to name canonical
+
+A drift item where the user won't pick canonical is logged to "Assumptions and Open Questions" with `reconciliation: open`. The spec ships at `status: verified` (this is not a blocking assertion) but the reconciliation gap is captured for later DMAIC review.
+
+### Step 8 exit gate
+
+| Check | Type | Method |
+|---|---|---|
+| Drift items enumerated | Structural | Script |
+| Each item has a canonical decision (or `reconciliation: open` log) | Decision | Human |
+| Reconciliation table present in spec | Structural | Script |
+
+---
+
 ## Telemetry (deterministic capture for the skill itself)
 
-The skill captures its own session telemetry — gate fires, soft fails, qa-agents findings, phase loop-backs, user decisions, threshold surfacings. Telemetry is **best-effort**; if the destination is unreachable, the skill completes anyway with a degraded-mode warning. **Output correctness does not depend on telemetry working.**
+The skill captures its own session telemetry — gate fires, soft fails, qa-agents findings, phase loop-backs, user decisions, threshold surfacings, post-handoff clarifications. Telemetry is **best-effort**; if the destination is unreachable, the skill completes anyway with a degraded-mode warning. **Output correctness does not depend on telemetry working.**
 
 **Default location:** `$PROCESS_DESIGN_LOG_DIR/<YYYY-MM-DD>-<process-slug>.jsonl`. If the env var is unset, default to `~/.claude/process-design-sessions/`. The skill never hardcodes vault- or environment-specific paths.
 
-**Event taxonomy.** Every line is a single JSON object: `{ "ts": ISO8601, "phase": int, "event": <type>, "detail": {...} }`. Types separate session boundaries from in-phase events:
+**Event taxonomy.** Every line is a single JSON object: `{ "ts": ISO8601, "phase": int|string, "event": <type>, "detail": {...} }`.
 
 | Event | When | `detail` keys |
 |---|---|---|
-| `session_start` | Skill invocation | `process_slug`, `build_target` |
-| `phase_start` | Each phase enters | `phase`, `phase_name` |
-| `phase_complete` | Each phase passes its gate | `phase`, `duration_ms`, `mode` (Phase 4 only: `task_fanout` \| `inline_simulation`; Phase 7 only: `skill_invocation` \| `inline_simulation`) |
+| `session_start` | Skill invocation | `process_slug`, `build_target`, `step_0_fired` |
+| `phase_start` | Each step enters | `phase`, `phase_name` |
+| `phase_complete` | Each step passes its gate | `phase`, `duration_ms`, `mode` (Step 1-exit: `task_fanout` \| `inline_simulation` \| `partial_<N>_of_4`; Step 6: `skill_invocation` \| `inline_simulation`) |
 | `gate_hard_fail` | First failure of a gate check (before retry) | `phase`, `gate`, `check`, `detail` |
 | `gate_soft_fail` | After one retry failed; gap logged to Assumptions | `phase`, `gate`, `check`, `detail` |
 | `gate_pass` | Gate passes (after retry, if any) | `phase`, `gate` |
 | `soft_fail_threshold_surfaced` | 4th, 7th, … soft fail about to log | `accumulated_count`, `unresolved_list` |
+| `step_aborted` | User abandons mid-step (distinct from `step_failed`) | `phase`, `state_at_abort` |
 | `user_decision` | User answers a surfacing or path question | `prompt`, `response_summary` |
-| `loop_back` | Phase 7 routes a finding to an earlier phase | `from_phase`, `to_phase`, `finding_type`, `severity` |
+| `loop_back` | Step 6 routes a finding to an earlier step | `from_phase`, `to_phase`, `finding_type`, `severity` |
 | `qa_finding` | Single confirmed finding from qa-agents | `finding_type`, `severity` (low/medium/critical), `where`, `summary` |
-| `session_complete` | Phase 8 final assertions passed | `outcome` (verified / draft-with-blockers), `total_soft_fails` |
+| `step_2_review_outcome` | Hard gate decision | `outcome` (`confirm` \| `reject_named` \| `reject_silent`), `named_target` (if any), `time_to_decide_seconds` |
+| **`post_handoff_clarification`** | Build agent returns asking for spec clarification (post-Step-7) | `spec_path`, `question_type`, `clarification_text`, `routed_to_step` (which step the question maps to) |
+| `step_8_drift_item` | Reconciliation surfaces a drift item | `item`, `canonical` (`spec` \| `source` \| `merge` \| `open`) |
+| `session_complete` | Step 7 final assertions passed | `outcome` (`verified` \| `draft-with-blockers`), `total_soft_fails` |
 
-A telemetry consumer (e.g., a `dmaic` review session over many process-design runs) can reconstruct the full session shape: clean runs, hard-failed-then-recovered runs, soft-failed-and-shipped runs, abandoned runs. The `mode` dimension on Phase 4 / Phase 7 events lets a consumer slice further — e.g., compare `inline_simulation` runs against `task_fanout` runs to see if simulation mode produces more late-stage soft fails or weaker qa-agents finding sets.
+The `post_handoff_clarification` event is the **headline measurable signal** for whether the skill produced a complete spec. A high rate of these events indicates the spec is leaving ambiguities the build agent can't resolve. DMAIC reviews use this to drive improvements.
+
+A telemetry consumer (e.g., a `dmaic` review session) can reconstruct the full session shape: clean runs, hard-failed-then-recovered runs, soft-failed-and-shipped runs, abandoned runs. The `mode` dimension on Step 1-exit / Step 6 events lets a consumer slice further — e.g., compare `inline_simulation` runs against `task_fanout` runs.
 
 ---
 
@@ -580,37 +748,44 @@ A telemetry consumer (e.g., a `dmaic` review session over many process-design ru
 - **No telemetry storage decisions for the produced spec's process.** Spec names what to capture; build agent decides where for its own runtime.
 - **No domain expertise.** The skill questions; it doesn't validate domain reasoning.
 - **No silent deletion.** Every deletion proposed and confirmed, with metrics impact named.
-- **No diagram-free output.** Diagram is mandatory.
+- **No diagram-free output.** Diagram is mandatory AND foregrounded.
 - **No vault-specific assumptions in the produced spec.** Portable.
-- **No re-implementation of qa-agents internals.** Phase 7 delegates.
+- **No re-implementation of qa-agents internals.** Step 6 delegates.
 - **No implementation prescriptions in handoff.** Architecture, not mechanism.
+- **No silent skip of Step 2 Review.** The hard gate is mandatory.
 
 ---
 
 ## Worked Example: Approval Workflow
 
-**Phase 1:** Output: approved/rejected request with reasoning. Controllable inputs: request content, reviewer evaluation. Uncontrollable: reviewer availability, submission timing. Build target: Python script.
+**Step 0:** No existing description supplied; skipped.
 
-**Gate 1 passes.**
+**Step 1A (Output):** approved/rejected request with reasoning. Distributed deletion: candidate "audit log entry" challenged — does the consumer (next reviewer) need it? Yes. Kept.
 
-**Phase 2:** Output metrics: % reaching terminal state, % approved, reasoning completeness score. Controllable input metrics: request.content.completeness, request.content.length, reviewer.evaluation.specificity. Standard performance metrics on every step. Process health: submission-to-decision cycle time, % escalated, throughput per reviewer. Anecdote/exception: log every escalation in detail; log any decision >7 days from submission.
+**Step 1B (Inputs):** request content, reviewer evaluation. Uncontrollable: reviewer availability, submission timing.
 
-**Gate 2 passes.**
+**Step 1C (Transitions):** trace test fails on "notify reviewer" and "notify submitter" — these don't move inputs toward output. Distributed deletion: marked 🚩 in-line.
 
-**Phase 3:** Trace test fails on "notify reviewer" and "notify submitter" — these don't move inputs toward output. Metrics test confirms they emit nothing. Deleted cleanly. Add-back zero. Add-back ratio: 0 / 2 = 0 (sanity check passes).
+**Step 1D (Failure modes):** reviewer-never-responds, submitter-resubmits-unchanged, ambiguous-criteria.
 
-**Gate 3 passes.**
+**Step 1 exit (Gap-probe):** four parallel `Task` invocations. Mode: `task_fanout`. All 4 returned valid. Notable additions: SLA + escalation gate, diff-required validation, validation gate before review.
 
-**Phase 4 (sub-agent fan-out):** Four parallel `Task` invocations return findings. Notable additions: reviewer-never-responds → SLA + escalation gate; submitter-resubmits-unchanged → diff-required validation; ambiguous-criteria → reviewer escalates; malformed-request → validation gate before review.
+**Step 2 (Render):** Mermaid generated, `mmdc` renders to `approval-workflow.flowchart.png`. Post-render validation passes. Image path foreground-surfaced in agent response.
 
-**Gate 4 passes.**
+**Step 2 Review (HARD GATE):** user replies `confirm`. Proceeds.
 
-**Phase 5:** Diagram type: flowchart (procedure with loop, no dwelling). Verification suite enumerated, all checks classified as script or agent.
+**Step 3 (Final pruning):** "notify reviewer" and "notify submitter" formally deleted (already 🚩'd in 1C). Add-back zero. Add-back ratio: 0 (vacuous).
 
-**Phase 6:** Spec drafted with two visible gates (input validation, SLA timeout). Written to disk as `status: draft`. `verify_spec.py` (Gate 6) passes on first run.
+**Step 4 (Metrics):** Output: % reaching terminal state, % approved, reasoning completeness score, **post_handoff_clarification_rate**. Controllable inputs: request.content.completeness, reviewer.evaluation.specificity. Standard performance metrics on every step. Process health: cycle time, % escalated, throughput per reviewer.
 
-**Phase 7:** `Skill(qa-agents)` invoked on the draft. Finder identifies 4 issues (3 low, 1 medium). Auditor disproves 2 as false positives (the spec already addresses them). Referee confirms 2 real issues — both are missing edge cases. Per the routing table, both fixes loop back to Phase 4. Phase 4 re-run for those edges, spec updated, verify_spec.py re-run on the updated draft. Re-invoke qa-agents on the updated draft: clean. Spec promoted to `status: verified`.
+**Step 5 (Review cadence):** monthly DMAIC. Quorum: process owner + one reviewer. Trigger: critical-severity qa-agents finding repeating across 2+ runs OR `post_handoff_clarification_rate` > 15%. Telemetry destination: `~/.claude/process-design-sessions/`.
 
-**Phase 8:** `render_handoff.py --target python-script` generates the build prompt — capture mechanism examples include decorators and context managers; structured logging library prescribed for the deterministic-capture property.
+**Step 6 (Verify):**
+- `verify_spec.py --final` exits 0. Output: `PASSED: 18/18 final blocking assertions`. (Includes new `image_freshness` — image is fresh, vacuous-pass branch not used.)
+- `Skill(qa-agents)` invoked. Mode: `skill_invocation`. Finder identifies 4 issues. Auditor disproves 2. Referee confirms 2 — both `edge-case` findings → loop back to Step 1 exit (gap-probe). Re-run that step for those edges, spec updated, `verify_spec.py` re-run, qa-agents re-run: clean. Spec promoted to `status: verified`.
 
-The artifact is now (a) executable by an agent, code, or human, (b) auditable at-a-glance via the diagram with visible gates, (c) measurable from day one with input metrics that will evolve, and (d) iteratively improvable through the metrics review loop (run `Skill(dmaic)` against it to walk the cycle). That's the bar.
+**Step 7 (Handoff):** `render_handoff.py --target python-script` generates the build prompt. Image path, spec path, and build-prompt path foreground-surfaced.
+
+**Step 8:** Step 0 didn't fire; skipped.
+
+The artifact is now (a) executable by an agent, code, or human, (b) auditable at-a-glance via the **rendered image** with visible gates, (c) measurable from day one with input metrics that will evolve, and (d) iteratively improvable through the metrics review loop (run `Skill(dmaic)` against it). That's the bar.

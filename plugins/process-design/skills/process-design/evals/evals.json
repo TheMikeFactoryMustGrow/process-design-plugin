@@ -10,8 +10,9 @@
       "expectations": [
         "Spec file written to the expected output path",
         "verify_spec.py on the spec exits 0 (Gate 6 passes)",
-        "verify_spec.py --final on the spec exits 0 (all 17 final blocking assertions pass)",
-        "Frontmatter has status: verified (Phase 7 promotion completed)",
+        "verify_spec.py --final on the spec exits 0 (all final blocking assertions pass)",
+        "verify_spec.py --final stdout includes structured 'PASSED: N/N final blocking assertions' summary line (count is proof-of-work evidence; matches between numerator and denominator)",
+        "Frontmatter has status: verified (Phase 6 verification + promotion completed)",
         "Frontmatter has build_target: claude-code",
         "Mermaid block has at least 5 step nodes plus at least one explicit GATE decision node",
         "Procedure includes an explicit review/iteration loop (revisions go back to review)",
@@ -21,7 +22,7 @@
         "Edge Cases section has at least 3 real (non-placeholder) rows",
         "Build handoff file exists at outputs/build-handoff.md and references the spec path",
         "Build handoff names Claude-Code-specific capture mechanisms (hooks, MCP servers)",
-        "Session notes describe what happened in each of the 8 phases"
+        "Session notes describe each step that ran (Steps 1–7 always; Steps 0 and 8 only if their conditional triggers fired)"
       ]
     },
     {
@@ -33,7 +34,8 @@
       "expectations": [
         "Spec file written to the expected output path",
         "verify_spec.py on the spec exits 0 (Gate 6 passes)",
-        "verify_spec.py --final on the spec exits 0 (all final assertions pass)",
+        "verify_spec.py --final on the spec exits 0 (all final blocking assertions pass)",
+        "verify_spec.py --final stdout includes structured 'PASSED: N/N final blocking assertions' summary line (count is proof-of-work evidence; matches between numerator and denominator)",
         "Frontmatter has status: verified",
         "Cadence is named (Friday or weekly) somewhere in the spec",
         "Output is a written review artifact (markdown / document), not a verb",
@@ -43,7 +45,7 @@
         "Edge Cases include 'commitment slipped' or equivalent recurring failure mode",
         "Build handoff file exists and references the chosen target with appropriate capture mechanisms",
         "Decision rules resolve on input alone (no 'use judgment' or vague criteria)",
-        "Session notes describe each of the 8 phases"
+        "Session notes describe each step that ran (Steps 1–7 always; Steps 0 and 8 only if their conditional triggers fired)"
       ]
     },
     {
@@ -55,7 +57,8 @@
       "expectations": [
         "Spec file written to the expected output path",
         "verify_spec.py on the spec exits 0",
-        "verify_spec.py --final on the spec exits 0",
+        "verify_spec.py --final on the spec exits 0 (all final blocking assertions pass)",
+        "verify_spec.py --final stdout includes structured 'PASSED: N/N final blocking assertions' summary line (count is proof-of-work evidence; matches between numerator and denominator)",
         "Frontmatter has status: verified",
         "Frontmatter has build_target: python-script",
         "Trigger condition for the feedback loop is explicit (e.g. user moves file post-routing, or user flags mis-route)",
@@ -65,7 +68,7 @@
         "Edge Cases include conflicting signals (two corrections disagree) or equivalent",
         "Build handoff names Python-specific capture mechanisms (decorators, context managers, structured logging)",
         "Decision rules are testable on input alone",
-        "Session notes describe each of the 8 phases"
+        "Session notes describe each step that ran (Steps 1–7 always; Steps 0 and 8 only if their conditional triggers fired)"
       ]
     }
   ]

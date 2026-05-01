@@ -7,6 +7,12 @@ Usage:
 
 Exit code 0 = all checks passed, 1 = one or more failed, 2 = bad invocation.
 
+In --final mode, prints a structured `PASSED: N/N final blocking assertions`
+or `FAILED: M/N final blocking assertions` summary line in addition to the
+per-check report. The eval suite asserts on this line; paired drift between
+the assertion table in SKILL.md, the assertions implemented here, and the
+eval expectations is a defect.
+
 Stdlib only. The spec is a markdown file with YAML frontmatter at the top and
 sections matching templates/process-spec-template.md.
 """
@@ -416,6 +422,38 @@ def verify(path: Path, final: bool) -> Result:
             f"missing dimensions for: {unmetricked}" if unmetricked else "",
         )
 
+    # image_freshness: when an image file exists alongside the spec
+    # (`<process-slug>.flowchart.png` or `.svg`), its mtime must be >= the
+    # spec's mtime. This catches the case where the spec was edited after
+    # rendering (e.g., during Step 3 pruning) but the image wasn't
+    # re-rendered. If no image is present, the check is a vacuous pass —
+    # specs that don't render to image are allowed (e.g., text-only fallback
+    # paths). The eval expectation count assumes this check is always
+    # present in the assertion list, regardless of whether the spec triggers
+    # the substantive branch.
+    image_path = _find_sibling_image(path)
+    if image_path is not None:
+        try:
+            spec_mtime = path.stat().st_mtime
+            image_mtime = image_path.stat().st_mtime
+            res.check(
+                "image_freshness (image mtime >= spec mtime)",
+                image_mtime >= spec_mtime,
+                f"image at {image_path.name} is older than spec; re-render before verifying"
+                if image_mtime < spec_mtime else "",
+            )
+        except OSError as exc:
+            res.check(
+                "image_freshness (image mtime >= spec mtime)",
+                False,
+                f"could not stat: {exc}",
+            )
+    else:
+        res.check(
+            "image_freshness (vacuous pass: no image file alongside spec)",
+            True,
+        )
+
     # Per-step coverage: each numbered step's block must mention the standard
     # performance metrics block. (A spec where step 1 mentions it five times
     # and steps 2–5 don't mention it at all should NOT pass this gate, even
@@ -437,6 +475,26 @@ def verify(path: Path, final: bool) -> Result:
 
 def _is_gate(label: str) -> bool:
     return "GATE" in label.upper()
+
+
+def _find_sibling_image(spec_path: Path) -> Path | None:
+    """Find a rendered flowchart image next to the spec, if present.
+
+    Looks for `<process-slug>.flowchart.{png,svg}` derived from the spec
+    filename. Recognized spec stems: `<slug>.process-spec` (drops the
+    suffix to derive the slug). Returns None if no candidate exists —
+    the image_freshness check then runs the vacuous-pass branch.
+    """
+    stem = spec_path.stem
+    if stem.endswith(".process-spec"):
+        slug = stem[: -len(".process-spec")]
+    else:
+        slug = stem
+    for ext in ("png", "svg"):
+        candidate = spec_path.parent / f"{slug}.flowchart.{ext}"
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _parse_inputs(inputs_body: str) -> list:
@@ -475,6 +533,19 @@ def main(argv: list[str]) -> int:
 
     res = verify(args.spec, args.final)
     print(res.report())
+
+    # Structured summary line — the eval suite asserts on this, and the count
+    # serves as proof-of-work evidence (we know exactly which assertions are
+    # checked, not a vague "the verifier passed"). When the assertion table in
+    # SKILL.md changes, this count, the eval expectations, and the table all
+    # change together. Drift between any of the three is a defect.
+    if args.final:
+        total = len(res.passed) + len(res.failed)
+        if not res.failed:
+            print(f"PASSED: {total}/{total} final blocking assertions")
+        else:
+            print(f"FAILED: {len(res.failed)}/{total} final blocking assertions")
+
     return 0 if not res.failed else 1
 
 
