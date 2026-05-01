@@ -1,0 +1,76 @@
+%%{init: {'theme':'default', 'flowchart': {'htmlLabels': true, 'curve': 'basis'}}}%%
+flowchart TD
+    Start([User invokes /process-design with intent])
+
+    Q0{{"Existing description<br/>supplied?"}}
+    Step0["<b>Step 0: Ingest</b><br/>parse, transcribe, confirm<br/><sub><i>req: agent / breaks: source-spec drift</i></sub>"]
+
+    Step1A["<b>Step 1A: Output anchored</b><br/>concrete noun, success/failure, consumers<br/><sub><i>req: user+agent / breaks: P1 — no design possible</i></sub>"]
+    Step1B["<b>Step 1B: Inputs declared</b><br/>validated, sourced, controllability marked<br/><sub><i>req: user+agent / breaks: garbage-in</i></sub>"]
+    Step1C["<b>Step 1C: Transitions named</b><br/>steps, decisions, gates, terminals<br/><sub><i>req: agent+user / breaks: no procedure</i></sub>"]
+    Step1D["<b>Step 1D: Failure modes specified</b><br/>per-step failure + recovery<br/><sub><i>req: agent+user / breaks: P3 — silent prod failure</i></sub>"]
+
+    GapProbe["<b>Step 1 exit: Gap-probe fan-out</b><br/>4 sub-agents (input / decision / failure / missing)<br/><sub><i>req: Task subagent runtime / breaks: single-perspective escape</i></sub>"]
+
+    Q1{{"All 4 sub-agents<br/>returned valid?"}}
+    Fallback["retry missing / inline_simulation<br/>log mode in Verification Record"]
+
+    Step2["<b>Step 2: Render</b><br/>Mermaid → image, validate post-render<br/><sub><i>req: mmdc CLI / breaks: no visual deliverable</i></sub>"]
+
+    Q2{{"<b>Step 2 Review</b><br/>HARD GATE"}}
+    Reject1["reject + named target<br/>(loop)"]
+    Reject2["reject without target<br/>→ default to Step 1A"]
+
+    Step3["<b>Step 3: Final pruning</b><br/>concentrated Elon pass against visualized procedure<br/><sub><i>req: agent+user / breaks: P2 — bloat ships</i></sub>"]
+    Step4["<b>Step 4: Metrics design</b><br/>output / controllable input / agent / health<br/><sub><i>req: agent+user / breaks: P4 — unmeasurable</i></sub>"]
+    Step5["<b>Step 5: Review cadence + DMAIC + telemetry dest</b><br/><sub><i>req: agent+user / breaks: P5 — no improvement loop</i></sub>"]
+    Step6["<b>Step 6: Verify</b><br/>verify_spec.py + qa-agents or inline_simulation<br/>(includes image_freshness assertion)<br/><sub><i>req: scripts + qa-agents skill / breaks: defects escape</i></sub>"]
+
+    Q3{{"Blocking assertion<br/>fails?"}}
+    Demote["demote to draft<br/>loop per assertion table"]
+
+    Step7["<b>Step 7: Handoff</b><br/>build prompt + image path + spec path<br/><sub><i>req: agent / breaks: build agent confusion</i></sub>"]
+
+    Step8["<b>Step 8: Reconcile</b> (cond: step_0_fired)<br/>surface drift, user names canonical<br/><sub><i>req: user / breaks: silent source↔spec divergence</i></sub>"]
+
+    EndNode([spec status:verified<br/>+ flowchart image<br/>+ build prompt])
+
+    Start --> Q0
+    Q0 -->|yes| Step0
+    Q0 -->|no| Step1A
+    Step0 --> Step1A
+    Step1A --> Step1B
+    Step1B --> Step1C
+    Step1C --> Step1D
+    Step1D --> GapProbe
+    GapProbe --> Q1
+    Q1 -->|no| Fallback
+    Fallback --> Step2
+    Q1 -->|yes| Step2
+    Step2 --> Q2
+    Q2 -->|confirm| Step3
+    Q2 -->|reject + named| Reject1
+    Q2 -->|reject silent| Reject2
+    Reject1 -.->|to named step| Step1A
+    Reject2 -.-> Step1A
+    Step3 --> Step4
+    Step4 --> Step5
+    Step5 --> Step6
+    Step6 --> Q3
+    Q3 -->|yes| Demote
+    Demote -.->|loop per table| Step1A
+    Q3 -->|no| Step7
+    Step7 --> Step8
+    Step8 --> EndNode
+
+    classDef gate fill:#fff5d6,stroke:#c89200,stroke-width:2px
+    classDef hardgate fill:#ffd6d6,stroke:#c80000,stroke-width:3px
+    classDef terminal fill:#d6f5d6,stroke:#008800,stroke-width:2px
+    classDef step fill:#e6f0ff,stroke:#0040a0,stroke-width:1.5px
+    classDef fallback fill:#f0f0f0,stroke:#666,stroke-width:1px,stroke-dasharray: 5 3
+
+    class Q0,Q1,Q3 gate
+    class Q2 hardgate
+    class Start,EndNode terminal
+    class Step0,Step1A,Step1B,Step1C,Step1D,GapProbe,Step2,Step3,Step4,Step5,Step6,Step7,Step8 step
+    class Fallback,Reject1,Reject2,Demote fallback
