@@ -33,7 +33,11 @@ cp -R "$PLUGIN_SRC/." "$STAGE/"
 cd "$STAGE"
 find . -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 find . -name '.DS_Store' -delete 2>/dev/null || true
-zip -qr /tmp/process-design.plugin . -x "*.DS_Store" "*__pycache__*"
+# Strip dev-only artifacts. evals/ contains regression-test prompts used by
+# skill-creator iteration; downstream installs don't need them and they may
+# carry workflow-specific identifying content.
+find . -path '*/skills/process-design/evals' -type d -exec rm -rf {} + 2>/dev/null || true
+zip -qr /tmp/process-design.plugin . -x "*.DS_Store" "*__pycache__*" "*/evals/*" "*/evals"
 mv /tmp/process-design.plugin "$OLDPWD/dist/process-design.plugin"
 
 cd "$OLDPWD"

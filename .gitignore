@@ -20,3 +20,12 @@ process-design-sessions/
 
 # Build output stays committed only when tagged for release
 dist/*.plugin.bak
+dist/.test-write
+
+# Dev-only artifacts — kept locally for skill-creator regression testing,
+# excluded from GitHub and from the bundled .plugin zip. Eval prompts may
+# reference real workflow names (people, projects); workspaces/ holds
+# historical iteration outputs which bloat the public repo without giving
+# downstream users anything actionable.
+plugins/process-design/skills/process-design/evals/
+workspaces/
