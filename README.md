@@ -9,14 +9,15 @@ The headliner skill, `process-design`, walks you through nine steps (Steps 0–8
 
 The diagram is hoisted **early** (Step 2, before metrics design) and gated on explicit user confirmation. You see the visual, you confirm it represents the procedure you intended, *then* the skill wires up metrics. This is the most important behavioral change from v0.1.0 — designed to catch wrong-design before it gets cemented.
 
-The plugin bundles two supporting skill families that `process-design` calls and that you can also invoke independently:
+The plugin bundles three supporting skill families that `process-design` calls and that you can also invoke independently:
 
 - **`qa-agents`** — adversarial three-agent review (Finder + Auditor + Referee). Step 6 of `process-design` delegates here for semantic verification; you can also invoke it directly to stress-test any artifact: code, documents, deal memos, contracts, financial models, decisions.
 - **`dmaic`** — Six Sigma cycle (Define → Measure → Analyze → Improve → Control). The Metrics Review Plan in every spec `process-design` produces points users at this skill to actually run review cycles. Five phase skills (`dmaic-define`, `dmaic-measure`, `dmaic-analyze`, `dmaic-improve`, `dmaic-control`) are individually callable for à-la-carte use.
+- **`elons-operating-algorithm`** — one-shot pressure test of any artifact (spec, plan, architecture, roadmap, feature list, process). Runs Elon's full 5-step Operating Algorithm in strict order — *question every requirement → delete → simplify → accelerate → automate* — and produces a structured deletion-first review note with verdicts (KEEP / QUESTION / DECOUPLE / DEFER / DELETE / SIMPLIFY), a "what survives" synthesis, a 10% add-back log, and a deepest-question reframe. Modeled on the Bean Counter Architecture Pressure Test that compressed a 20-story roadmap to 8.
 
 ## Why bundled
 
-These three are designed to compose. A spec produced by `process-design` is verified by `qa-agents` (Step 6 adversarial layer) and reviewed over time via `dmaic` (Step 5 cadence handoff). Bundling them means you install one plugin and get a working chain. Each skill is still independently invokable as `process-design:qa-agents`, `process-design:dmaic-measure`, etc.
+These four are designed to compose. A spec produced by `process-design` is verified by `qa-agents` (Step 6 adversarial layer), reviewed over time via `dmaic` (Step 5 cadence handoff), and pressure-tested for bloat by `elons-operating-algorithm` whenever it starts to feel overbuilt. Bundling them means you install one plugin and get a working chain. Each skill is still independently invokable as `process-design:qa-agents`, `process-design:dmaic-measure`, `process-design:elons-operating-algorithm`, etc.
 
 ## What `process-design` does, step by step
 
@@ -49,7 +50,7 @@ Distributed deletion means every input, transition, metric, and check is challen
 /plugin install process-design@process-design-plugin
 ```
 
-That's it. All eight skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`.
+That's it. All nine skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`, `process-design:elons-operating-algorithm`.
 
 ### Cowork (drag-and-drop)
 
