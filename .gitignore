@@ -29,3 +29,6 @@ dist/.test-write
 # downstream users anything actionable.
 plugins/process-design/skills/process-design/evals/
 workspaces/
+
+# Per-machine Claude Code overrides (GitButler hooks etc.)
+.claude/settings.local.json

@@ -1,7 +1,7 @@
 {
   "name": "process-design",
-  "version": "0.3.0",
-  "description": "Process Design with extra benefits \u2014 a thought-partner skill that walks you from a fuzzy intuition to a build-ready spec via Working Backwards, metrics-first design, Elon's algorithm, gap probing, TDD-style verification, drafting, adversarial verification, and an implementation-agnostic build handoff. Bundles qa-agents (adversarial three-agent review) for Phase 7 verification and the dmaic skill family (Define / Measure / Analyze / Improve / Control) for metrics review cycles. All eight skills callable independently.",
+  "version": "0.4.0",
+  "description": "Process Design with extra benefits — a thought-partner skill that walks you from a fuzzy intuition to a build-ready spec via Working Backwards, metrics-first design, Elon's algorithm, gap probing, TDD-style verification, drafting, adversarial verification, and an implementation-agnostic build handoff. Bundles qa-agents (adversarial three-agent review) for Phase 7 verification, the dmaic skill family (Define / Measure / Analyze / Improve / Control) for metrics review cycles, and elons-operating-algorithm (one-shot pressure test that runs Elon's full 5-step algorithm against any artifact — spec, plan, architecture, roadmap — and produces a structured deletion-first review). All nine skills callable independently.",
   "author": {
     "name": "Mike Lingle"
   },
@@ -9,6 +9,8 @@
     "process-design",
     "working-backwards",
     "elon-algorithm",
+    "elons-operating-algorithm",
+    "pressure-test",
     "metrics",
     "spec-writing",
     "thought-partner",

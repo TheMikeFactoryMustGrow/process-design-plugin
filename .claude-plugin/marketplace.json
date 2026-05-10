@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "process-design-plugin",
-  "description": "Process Design with extra benefits — a thought-partner skill that walks you from fuzzy intuition to a build-ready spec, bundled with qa-agents (adversarial review) and dmaic (Define/Measure/Analyze/Improve/Control) for verification and metrics review.",
+  "description": "Process Design with extra benefits — a thought-partner skill that walks you from fuzzy intuition to a build-ready spec, bundled with qa-agents (adversarial review), dmaic (Define/Measure/Analyze/Improve/Control) for metrics review, and elons-operating-algorithm (one-shot pressure test against any artifact).",
   "owner": {
     "name": "Mike Lingle",
     "email": "mike.lingle@icloud.com"
@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "process-design",
-      "description": "Eight composable skills for designing processes that build agents can actually execute. The headliner walks you through Steps 0–8: optional Ingest of an existing description, Working Backwards anchor with distributed deletion at every sub-step, parallel gap-probe fan-out, early Render of the flowchart with a hard-gate user review BEFORE metrics design, concentrated final pruning post-visual, metrics across four categories, review cadence + DMAIC handoff, structural + adversarial Verify, build-target handoff, and optional spec↔source Reconcile. The flowchart is the primary deliverable and is foreground-surfaced in the agent response. Sibling skills qa-agents (Finder/Auditor/Referee adversarial review) and dmaic + 5 phase skills (Define/Measure/Analyze/Improve/Control) are independently invokable.",
+      "description": "Nine composable skills for designing processes that build agents can actually execute. The headliner walks you through Steps 0–8: optional Ingest of an existing description, Working Backwards anchor with distributed deletion at every sub-step, parallel gap-probe fan-out, early Render of the flowchart with a hard-gate user review BEFORE metrics design, concentrated final pruning post-visual, metrics across four categories, review cadence + DMAIC handoff, structural + adversarial Verify, build-target handoff, and optional spec↔source Reconcile. The flowchart is the primary deliverable and is foreground-surfaced in the agent response. Sibling skills: qa-agents (Finder/Auditor/Referee adversarial review), dmaic + 5 phase skills (Define/Measure/Analyze/Improve/Control), and elons-operating-algorithm (one-shot pressure test of any artifact, running Elon's full 5-step algorithm — question, delete, simplify, accelerate, automate — and producing a structured deletion-first review note). All independently invokable.",
       "category": "productivity",
       "source": "./plugins/process-design",
       "homepage": "https://github.com/TheMikeFactoryMustGrow/process-design-plugin"
