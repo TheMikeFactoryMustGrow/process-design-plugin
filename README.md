@@ -54,22 +54,6 @@ That's it. All nine skills load namespaced as `process-design:process-design`, `
 
 The plugin also appears in Claude Desktop's **Customize** panel automatically — a CLI install covers both surfaces.
 
-## Update
-
-When a new version lands in this repo:
-
-```bash
-# Refresh the marketplace catalog, then update the plugin
-claude plugin marketplace update process-design-plugin
-claude plugin update process-design@process-design-plugin
-```
-
-(Or from inside a session: `/plugin marketplace update process-design-plugin` then `/plugin update process-design@process-design-plugin`, followed by `/reload-plugins`.)
-
-**Set-and-forget option:** enable auto-update once — `/plugin` → **Marketplaces** tab → `process-design-plugin` → **Enable auto-update**. Every Claude Code restart then pulls the latest version automatically.
-
-> **Note for Claude Desktop users:** the desktop app's personal-plugin UI currently has no working update path for GitHub marketplaces — the Update button stays greyed out. Use the CLI commands above; the desktop app picks up the result.
-
 ### Cowork (drag-and-drop)
 
 1. Download [`dist/process-design.plugin`](dist/process-design.plugin) (or build it locally with `./build.sh`)
@@ -95,6 +79,22 @@ npm install -g @mermaid-js/mermaid-cli
 ```
 
 (Falls back to Obsidian-renderable fenced markdown if `mmdc` is unavailable.)
+
+## Update
+
+When a new version lands in this repo:
+
+```bash
+# Refresh the marketplace catalog, then update the plugin
+claude plugin marketplace update process-design-plugin
+claude plugin update process-design@process-design-plugin
+```
+
+(Or from inside a session: `/plugin marketplace update process-design-plugin` then `/plugin update process-design@process-design-plugin`, followed by `/reload-plugins`.)
+
+**Set-and-forget option:** enable auto-update once — `/plugin` → **Marketplaces** tab → `process-design-plugin` → **Enable auto-update**. Every Claude Code restart then pulls the latest version automatically.
+
+> **Note for Claude Desktop users:** the desktop app's personal-plugin UI currently has no working update path for GitHub marketplaces — the Update button stays greyed out. Use the CLI commands above; the desktop app picks up the result.
 
 ## Use
 
