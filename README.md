@@ -52,11 +52,15 @@ Distributed deletion means every input, transition, metric, and check is challen
 
 That's it. All nine skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`, `process-design:elons-operating-algorithm`.
 
+The plugin also appears in Claude Desktop's **Customize** panel automatically — a CLI install covers both surfaces.
+
 ### Cowork (drag-and-drop)
 
 1. Download [`dist/process-design.plugin`](dist/process-design.plugin) (or build it locally with `./build.sh`)
 2. Drop the file onto Cowork's plugin manager
 3. Click Install, restart your session
+
+Note: drag-and-drop installs are frozen snapshots with no update path — prefer the marketplace install above so you can pull new versions.
 
 ### Local development install
 
@@ -75,6 +79,22 @@ npm install -g @mermaid-js/mermaid-cli
 ```
 
 (Falls back to Obsidian-renderable fenced markdown if `mmdc` is unavailable.)
+
+## Update
+
+When a new version lands in this repo:
+
+```bash
+# Refresh the marketplace catalog, then update the plugin
+claude plugin marketplace update process-design-plugin
+claude plugin update process-design@process-design-plugin
+```
+
+(Or from inside a session: `/plugin marketplace update process-design-plugin` then `/plugin update process-design@process-design-plugin`, followed by `/reload-plugins`.)
+
+**Set-and-forget option:** enable auto-update once — `/plugin` → **Marketplaces** tab → `process-design-plugin` → **Enable auto-update**. Every Claude Code restart then pulls the latest version automatically.
+
+> **Note for Claude Desktop users:** the desktop app's personal-plugin UI currently has no working update path for GitHub marketplaces — the Update button stays greyed out. Use the CLI commands above; the desktop app picks up the result.
 
 ## Use
 
@@ -141,7 +161,7 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 ├── plugins/
 │   └── process-design/                      ← plugin source
 │       ├── .claude-plugin/plugin.json       ← plugin manifest (Cowork reads this)
-│       └── skills/                          ← 8 skills
+│       └── skills/                          ← 9 skills
 │           ├── process-design/              ← headliner
 │           ├── qa-agents/                   ← bundled adversarial review
 │           ├── dmaic/                       ← bundled Six Sigma orchestrator
@@ -149,7 +169,8 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 │           ├── dmaic-measure/
 │           ├── dmaic-analyze/
 │           ├── dmaic-improve/
-│           └── dmaic-control/
+│           ├── dmaic-control/
+│           └── elons-operating-algorithm/   ← bundled one-shot pressure test
 ├── dist/process-design.plugin               ← prebuilt zip for Cowork drag-and-drop
 ├── meta-spec/                               ← process-design applied to itself (v1)
 ├── build.sh                                 ← rebuild dist/process-design.plugin
@@ -161,7 +182,9 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 
 ## Versions
 
-- **v0.2.0** (current) — Render hoisted to Step 2 with hard-gate review; Phase 3 dissolved into distributed deletion + concentrated Step 3 pruning; Step 0 Ingest and Step 8 Reconcile added; foregrounding requirement on the rendered image; `image_freshness` blocking assertion; `post_handoff_clarification` telemetry event.
+- **v0.4.0** (current) — Adds `elons-operating-algorithm`: one-shot pressure test running Elon's full 5-step algorithm (question → delete → simplify → accelerate → automate) against any artifact, producing a structured deletion-first review note. Nine skills total.
+- **v0.3.0** — Restructured to Claude Code marketplace layout (`.claude-plugin/marketplace.json` + `plugins/` tree); repo doubles as an installable marketplace.
+- **v0.2.0** — Render hoisted to Step 2 with hard-gate review; Phase 3 dissolved into distributed deletion + concentrated Step 3 pruning; Step 0 Ingest and Step 8 Reconcile added; foregrounding requirement on the rendered image; `image_freshness` blocking assertion; `post_handoff_clarification` telemetry event.
 - **v0.1.0** — Initial release. Eight phases, Mermaid-block-as-output, render burial.
 
 ## License
