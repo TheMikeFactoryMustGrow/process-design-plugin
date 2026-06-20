@@ -33,7 +33,7 @@ compatibility: >-
   Record). Step 2 (Render) uses `mmdc` (Mermaid CLI) when available and falls back
   to Obsidian-renderable fenced markdown otherwise. Helper scripts in `scripts/`
   are Python 3 with stdlib only.
-version: 0.2.0
+version: 0.3.0
 ---
 
 # Process Design (Thought-Partner Mode → Reviewable Flowchart + Build-Ready Spec)
@@ -614,6 +614,7 @@ Every build prompt includes:
 3. Implement gates as named in the spec — script, agent, or human, per the gate's specification.
 4. Graceful degradation: if telemetry capture fails, the process completes with output and logs a degraded-mode warning. Output correctness must not depend on telemetry working.
 5. Surface ambiguity rather than papering it over. Ask before deviating.
+6. **Ship with an executable regression suite** that locks the spec's decision rules and the project's conventions into tests (run the `test-loop` skill on the build output). For a coded target this suite is the *primary* regression guard; `dmaic-control`'s monitoring then covers the runtime drift tests can't see.
 
 ### Build-Target-Specific Phrasing
 

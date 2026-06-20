@@ -9,15 +9,16 @@ The headliner skill, `process-design`, walks you through nine steps (Steps 0–8
 
 The diagram is hoisted **early** (Step 2, before metrics design) and gated on explicit user confirmation. You see the visual, you confirm it represents the procedure you intended, *then* the skill wires up metrics. This is the most important behavioral change from v0.1.0 — designed to catch wrong-design before it gets cemented.
 
-The plugin bundles three supporting skill families that `process-design` calls and that you can also invoke independently:
+The plugin bundles four supporting skill families that `process-design` calls and that you can also invoke independently:
 
-- **`qa-agents`** — adversarial three-agent review (Finder + Auditor + Referee). Step 6 of `process-design` delegates here for semantic verification; you can also invoke it directly to stress-test any artifact: code, documents, deal memos, contracts, financial models, decisions.
+- **`qa-agents`** — adversarial three-agent review (Finder + Auditor + Referee). Step 6 of `process-design` delegates here for semantic verification; you can also invoke it directly to stress-test any artifact: code, documents, deal memos, contracts, financial models, decisions. After synthesis it runs a **root-cause-analysis pass on confirmed major findings** (5 Whys → root cause → recurrence guard), routing each fix to `test-loop` (a regression test) or `dmaic-control` (a control) so the same class of flaw can't ship again.
 - **`dmaic`** — Six Sigma cycle (Define → Measure → Analyze → Improve → Control). The Metrics Review Plan in every spec `process-design` produces points users at this skill to actually run review cycles. Five phase skills (`dmaic-define`, `dmaic-measure`, `dmaic-analyze`, `dmaic-improve`, `dmaic-control`) are individually callable for à-la-carte use.
 - **`elons-operating-algorithm`** — one-shot pressure test of any artifact (spec, plan, architecture, roadmap, feature list, process). Runs Elon's full 5-step Operating Algorithm in strict order — *question every requirement → delete → simplify → accelerate → automate* — and produces a structured deletion-first review note with verdicts (KEEP / QUESTION / DECOUPLE / DEFER / DELETE / SIMPLIFY), a "what survives" synthesis, a 10% add-back log, and a deepest-question reframe. Modeled on the Bean Counter Architecture Pressure Test that compressed a 20-story roadmap to 8.
+- **`test-loop`** — builds the **executable regression guard**: writes the tests that lock a spec's decision rules and the project's conventions into assertions, measures coverage (statements + branches), and treats every failure it surfaces as a bug to fix at the root. The executable companion to `dmaic-control` — DMAIC *defines* the regression guard; this *builds* the code half. Run it on the output of a `process-design` Step 7 handoff, or any time code is declared "done" but not yet trusted.
 
 ## Why bundled
 
-These four are designed to compose. A spec produced by `process-design` is verified by `qa-agents` (Step 6 adversarial layer), reviewed over time via `dmaic` (Step 5 cadence handoff), and pressure-tested for bloat by `elons-operating-algorithm` whenever it starts to feel overbuilt. Bundling them means you install one plugin and get a working chain. Each skill is still independently invokable as `process-design:qa-agents`, `process-design:dmaic-measure`, `process-design:elons-operating-algorithm`, etc.
+These five are designed to compose. A spec produced by `process-design` is verified by `qa-agents` (Step 6 adversarial layer), reviewed over time via `dmaic` (Step 5 cadence handoff), pressure-tested for bloat by `elons-operating-algorithm` whenever it starts to feel overbuilt, and — once built — locked down by `test-loop` (the executable regression suite). Bundling them means you install one plugin and get a working chain. Each skill is still independently invokable as `process-design:qa-agents`, `process-design:dmaic-measure`, `process-design:elons-operating-algorithm`, etc.
 
 ## What `process-design` does, step by step
 
@@ -50,7 +51,7 @@ Distributed deletion means every input, transition, metric, and check is challen
 /plugin install process-design@process-design-plugin
 ```
 
-That's it. All nine skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`, `process-design:elons-operating-algorithm`.
+That's it. All ten skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`, `process-design:elons-operating-algorithm`, `process-design:test-loop`.
 
 The plugin also appears in Claude Desktop's **Customize** panel automatically — a CLI install covers both surfaces.
 
@@ -161,16 +162,17 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 ├── plugins/
 │   └── process-design/                      ← plugin source
 │       ├── .claude-plugin/plugin.json       ← plugin manifest (Cowork reads this)
-│       └── skills/                          ← 9 skills
+│       └── skills/                          ← 10 skills
 │           ├── process-design/              ← headliner
-│           ├── qa-agents/                   ← bundled adversarial review
+│           ├── qa-agents/                   ← bundled adversarial review + RCA
 │           ├── dmaic/                       ← bundled Six Sigma orchestrator
 │           ├── dmaic-define/
 │           ├── dmaic-measure/
 │           ├── dmaic-analyze/
 │           ├── dmaic-improve/
 │           ├── dmaic-control/
-│           └── elons-operating-algorithm/   ← bundled one-shot pressure test
+│           ├── elons-operating-algorithm/   ← bundled one-shot pressure test
+│           └── test-loop/                   ← bundled executable-regression-suite builder
 ├── dist/process-design.plugin               ← prebuilt zip for Cowork drag-and-drop
 ├── meta-spec/                               ← process-design applied to itself (v1)
 ├── build.sh                                 ← rebuild dist/process-design.plugin
@@ -182,7 +184,8 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 
 ## Versions
 
-- **v0.4.0** (current) — Adds `elons-operating-algorithm`: one-shot pressure test running Elon's full 5-step algorithm (question → delete → simplify → accelerate → automate) against any artifact, producing a structured deletion-first review note. Nine skills total.
+- **v0.5.0** (current) — Adds `test-loop` (builds the executable regression suite that locks a spec's decision rules and conventions into tests and surfaces real bugs in the process — the executable companion to `dmaic-control`) and a **root-cause-analysis pass in `qa-agents`** (5 Whys on confirmed major findings, routed to `test-loop` or `dmaic-control`). `process-design` Step 7's build prompt now requires a spec-locking regression suite; `dmaic-control` notes that for coded processes the test suite is the primary regression guard. Ten skills total.
+- **v0.4.0** — Adds `elons-operating-algorithm`: one-shot pressure test running Elon's full 5-step algorithm (question → delete → simplify → accelerate → automate) against any artifact, producing a structured deletion-first review note. Nine skills total.
 - **v0.3.0** — Restructured to Claude Code marketplace layout (`.claude-plugin/marketplace.json` + `plugins/` tree); repo doubles as an installable marketplace.
 - **v0.2.0** — Render hoisted to Step 2 with hard-gate review; Phase 3 dissolved into distributed deletion + concentrated Step 3 pruning; Step 0 Ingest and Step 8 Reconcile added; foregrounding requirement on the rendered image; `image_freshness` blocking assertion; `post_handoff_clarification` telemetry event.
 - **v0.1.0** — Initial release. Eight phases, Mermaid-block-as-output, render burial.

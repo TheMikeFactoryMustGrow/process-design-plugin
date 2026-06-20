@@ -5,7 +5,9 @@ description: >
   memos, contracts, financial models, or decisions. Spawns a Finder (severity-scored findings,
   +1/+5/+10), an Auditor (adversarially challenges each finding; +severity for valid disproofs,
   −2×severity for false ones), and a Referee (judges disagreements against ground truth, +1/−1).
-  Pauses for human review between phases. Trigger when the user says "QA this", "adversarial
+  Pauses for human review between phases. After synthesis, runs a root-cause-analysis pass on
+  confirmed major findings (5 Whys to bedrock, root-cause category, recurrence guard) so fixes
+  hit the cause, not the symptom. Trigger when the user says "QA this", "adversarial
   review", "stress test this", "red team this", "find bugs", "find issues", "challenge this",
   "audit this", "bar-raise this", or is about to ship a PR-FAQ, 6-pager, deal memo, contract,
   model, or code change and wants pressure-tested feedback tougher than a normal review.
@@ -13,7 +15,7 @@ compatibility: >
   Requires subagents (Task tool) to spawn the Finder, Auditor, and Referee in independent
   contexts. Without subagents the adversarial-isolation premise collapses and this skill
   should not be used.
-version: 0.4.0
+version: 0.5.0
 ---
 
 # QA Agents — Adversarial Three-Agent Review
@@ -221,6 +223,45 @@ After the script runs, present the report to the user as the primary deliverable
 If the user asked for an interactive run, they've already seen the intermediate outputs and don't need them re-summarized. Just present the final report.
 
 If the script isn't available for some reason, do the synthesis by hand using the same grouping rules. The script just removes the arithmetic.
+
+---
+
+## Phase 5 — Root-Cause Analysis (confirmed major findings)
+
+Run after Phase 4 synthesis, before presenting the report. The first four phases tell you **what** is wrong and how much to trust each finding. They don't tell you **why** — and a fix aimed at the symptom lets the same class of flaw return. For every **confirmed** finding of **major severity (5 or 10)**, run a root-cause pass. Skip borderline, disputed, and severity-1 findings — RCA is for the flaws worth preventing, not for triage noise.
+
+Run RCA inline, or spawn one fresh Task subagent for independence on large reports. For each major confirmed finding:
+
+1. **5 Whys to bedrock.** Ask "why did this happen?" until you reach a cause that is actionable and wouldn't itself need another "why" — a missing test, an unstated assumption, a spec gap, an undocumented convention, a tooling default. Stop at the first cause you can actually fix; don't manufacture five levels if three reach bedrock.
+2. **Categorize the root cause:** one of `spec-gap` | `missing-test` | `wrong-assumption` | `convention-undocumented` | `tooling-default` | `process-gap` | `knowledge-gap` | `other`.
+3. **Systemic check.** Would this same root cause produce *other* findings (here or elsewhere)? If yes, flag `systemic: true` — a systemic cause is worth more than the single finding that exposed it.
+4. **Fix at the root + guard recurrence.** State the fix that addresses the cause (not the symptom) and the guard that stops it returning. Route the guard:
+   - recurrence preventable by a test → **`test-loop`** (add the locking test)
+   - a spec / process / monitoring change → **`dmaic-control`** or **`process-design`**
+   - a genuine one-off with no systemic cause → just fix it
+
+**Output (single JSON object), saved to `outputs/qa-agents-<artifact-name>/rca.json`:**
+
+```json
+{
+  "rca": [
+    {
+      "id": "F1",
+      "title": "…",
+      "severity": 10,
+      "five_whys": ["why1 → because …", "why2 → because …", "ROOT: …"],
+      "root_cause_category": "missing-test",
+      "systemic": true,
+      "fix_at_root": "…",
+      "prevent_recurrence": "add a regression test that … (route: test-loop)"
+    }
+  ]
+}
+```
+
+Append a **## Root-Cause Analysis** section to the final report: per major finding, the root cause, the `systemic` flag, and the recurrence guard with its route. The synthesis script is unchanged — RCA runs after it and is appended.
+
+**Why RCA belongs here.** Without it, qa-agents is a smarter bug list. With it, each confirmed major flaw becomes a structural fix — a test (`test-loop`) or a control (`dmaic-control`) — so the same class of flaw can't ship again. That's the Six Sigma move: don't just find the defect, find the cause and guard it.
 
 ---
 

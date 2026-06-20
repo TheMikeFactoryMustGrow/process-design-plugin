@@ -11,6 +11,8 @@ Design the regression guard. The phase most people skip — and the reason most 
 
 ---
 
+> **Coded process?** The regression guard is not only monitoring — it's an executable **test suite** that stops a regression from ever shipping. Build it with the `test-loop` skill; the monitoring and alerts below then cover the runtime drift tests can't catch. Tests are the earlier, cheaper guard; monitoring is the backstop.
+
 ## When to use
 
 - "Prevent regression for [process / fix]"
