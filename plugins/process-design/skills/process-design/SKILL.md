@@ -33,7 +33,7 @@ compatibility: >-
   Record). Step 2 (Render) uses `mmdc` (Mermaid CLI) when available and falls back
   to Obsidian-renderable fenced markdown otherwise. Helper scripts in `scripts/`
   are Python 3 with stdlib only.
-version: 0.3.0
+version: 0.4.0
 ---
 
 # Process Design (Thought-Partner Mode → Reviewable Flowchart + Build-Ready Spec)
@@ -334,6 +334,26 @@ Step4["Validate input<br/><sub><i>req: Sarah / breaks: corrupt data</i></sub>"]
 **Gates (hexagons, `{{...}}`)** are exempt from owner annotation — gates' accountability lives in their named verification method (script / agent / human), not in a person.
 
 **Terminal states (stadium, `(...)`)** are exempt — they're end states, not requirements.
+
+#### Styling convention (canonical format)
+
+The diagram differentiates node roles by **shape** and **semantic color**, applied identically to every spec the skill produces. Use this exact `classDef` palette (see `templates/process-spec-template.md` for the role → shape → color table and a worked example):
+
+```
+classDef start       fill:#dff5e1,stroke:#1f8a4c,stroke-width:1.5px,color:#0e3a1d,font-weight:600;
+classDef step        fill:#d0e7ff,stroke:#3b82c9,stroke-width:1.5px,color:#0b3d6b,font-weight:600;
+classDef gate        fill:#fff3cd,stroke:#a07b00,stroke-width:1.2px,color:#5a4500;
+classDef hardgate    fill:#ffe0e0,stroke:#c80000,stroke-width:2.5px,color:#5a1414,font-weight:600;
+classDef termGood    fill:#c8f1d6,stroke:#1f8a4c,stroke-width:1.5px,color:#0e3a1d,font-weight:600;
+classDef termBad     fill:#f9d6d6,stroke:#a83232,stroke-width:1.5px,color:#5a1414,font-weight:600;
+classDef termNeutral fill:#e8e8e8,stroke:#888,stroke-width:1px,color:#222;
+classDef fallback    fill:#f0f0f0,stroke:#888,stroke-width:1px,stroke-dasharray:5 3,color:#333;
+```
+
+Two hard rules:
+
+- **Never lock the Mermaid `theme`.** Do not emit `%%{init: {'theme': ...}}%%`. Omitting it lets the rendered SVG follow the reader's system light/dark setting (e.g. Obsidian dark mode) — the canvas, edges, and text adapt while the role colors stay stable. (A `flowchart`-only init for `htmlLabels` / `curve` is fine; it must not set `theme`.)
+- **Color is in addition to shape, never instead of it.** The shape alone must still disambiguate role for a reader who cannot perceive the color difference.
 
 ### 2.2 Render to image
 

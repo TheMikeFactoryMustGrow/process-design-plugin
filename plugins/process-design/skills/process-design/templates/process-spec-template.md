@@ -143,14 +143,52 @@ For each branch in the procedure, an explicit testable criterion.
 
 The diagram annotates each step with its requirement owner and shows gates as decision nodes.
 
+**Format convention (canonical).** The diagram differentiates node roles by **shape** and **semantic color**, kept consistent across every spec the skill produces:
+
+| Role | Shape | `classDef` | Color |
+|---|---|---|---|
+| Process entry | stadium `([...])` | `start` | green |
+| Step | rectangle `["..."]` | `step` | blue |
+| Decision gate | hexagon `{{"..."}}` | `gate` | amber |
+| Hard / critical gate | hexagon `{{"..."}}` | `hardgate` | red border |
+| Success terminal | stadium `([...])` | `termGood` | green |
+| Failure terminal | stadium `([...])` | `termBad` | red |
+| Neutral terminal | stadium `([...])` | `termNeutral` | gray |
+| Side / recovery path | rectangle `["..."]` | `fallback` | gray, dashed |
+
+Two rules make it render well everywhere:
+
+1. **Do not lock the Mermaid `theme`.** Omit any `%%{init: {'theme': ...}}%%` so the canvas, edges, and text follow the reader's system light/dark setting (e.g. Obsidian dark mode). The fenced ` ```mermaid ` block renders as **vector (SVG)**, so it scales without quality loss. Tip for readers: install the Obsidian *Diagram Zoom Drag* community plugin to pan/zoom a large diagram in place.
+2. **Steps carry the owner annotation; gates and terminals do not** (their accountability lives in the gate's verification method / the terminal being an end state).
+
 ```mermaid
+%%{init: {'flowchart': {'htmlLabels': true, 'curve': 'basis'}}}%%
 flowchart TD
     Start(["Session begins"]) --> S1["step_id: action description<br/><sub><i>req: person</i></sub>"]
     S1 --> S2["step_id: action description<br/><sub><i>req: person</i></sub>"]
     S2 --> Gate1{{"GATE: verification check"}}
     Gate1 -->|pass| S3["step_id: action<br/><sub><i>req: person</i></sub>"]
     Gate1 -->|fail| Retry["retry or escalate<br/><sub><i>req: person</i></sub>"]
-    S3 --> End(["Terminal state"])
+    Gate1 -->|abort| Bad(["Terminal: failure"])
+    S3 --> End(["Terminal: success"])
+
+    %% --- Canonical styling: semantic color by role, shape by node type.
+    %% No `theme` lock — the diagram follows the reader's light/dark setting. ---
+    classDef start       fill:#dff5e1,stroke:#1f8a4c,stroke-width:1.5px,color:#0e3a1d,font-weight:600;
+    classDef step        fill:#d0e7ff,stroke:#3b82c9,stroke-width:1.5px,color:#0b3d6b,font-weight:600;
+    classDef gate        fill:#fff3cd,stroke:#a07b00,stroke-width:1.2px,color:#5a4500;
+    classDef hardgate    fill:#ffe0e0,stroke:#c80000,stroke-width:2.5px,color:#5a1414,font-weight:600;
+    classDef termGood    fill:#c8f1d6,stroke:#1f8a4c,stroke-width:1.5px,color:#0e3a1d,font-weight:600;
+    classDef termBad     fill:#f9d6d6,stroke:#a83232,stroke-width:1.5px,color:#5a1414,font-weight:600;
+    classDef termNeutral fill:#e8e8e8,stroke:#888,stroke-width:1px,color:#222;
+    classDef fallback    fill:#f0f0f0,stroke:#888,stroke-width:1px,stroke-dasharray:5 3,color:#333;
+
+    class Start start;
+    class S1,S2,S3 step;
+    class Gate1 gate;
+    class Retry fallback;
+    class End termGood;
+    class Bad termBad;
 ```
 
 ## Verification Suite

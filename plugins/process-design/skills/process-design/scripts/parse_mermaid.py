@@ -85,8 +85,17 @@ def parse(mermaid_src: str) -> Graph:
         return g
 
     lines = [line.rstrip() for line in mermaid_src.splitlines()]
-    if lines and not re.match(r"^\s*(flowchart|graph|stateDiagram|sequenceDiagram)", lines[0]):
-        g.errors.append(f"unrecognized first line: {lines[0]!r}")
+    # The diagram may open with a directive (`%%{init: ...}%%`) and/or `%%`
+    # comment lines before the diagram-type declaration. Skip them when
+    # validating the first real line.
+    first_decl = next(
+        (ln for ln in lines if ln.strip() and not ln.strip().startswith("%%")),
+        None,
+    )
+    if first_decl is not None and not re.match(
+        r"^\s*(flowchart|graph|stateDiagram|sequenceDiagram)", first_decl
+    ):
+        g.errors.append(f"unrecognized first line: {first_decl!r}")
 
     for raw in lines:
         line = raw.split("%%", 1)[0]

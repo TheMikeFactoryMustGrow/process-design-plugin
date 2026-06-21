@@ -60,7 +60,7 @@ telemetry: degraded
 ## Procedure
 
 ```mermaid
-%%{init: {'theme':'default', 'flowchart': {'htmlLabels': true, 'curve': 'basis'}}}%%
+%%{init: {'flowchart': {'htmlLabels': true, 'curve': 'basis'}}}%%
 flowchart TD
     Start([User invokes /process-design with intent])
 
@@ -125,15 +125,19 @@ flowchart TD
     Step7 --> Step8
     Step8 --> EndNode
 
-    classDef gate fill:#fff5d6,stroke:#c89200,stroke-width:2px
-    classDef hardgate fill:#ffd6d6,stroke:#c80000,stroke-width:3px
-    classDef terminal fill:#d6f5d6,stroke:#008800,stroke-width:2px
-    classDef step fill:#e6f0ff,stroke:#0040a0,stroke-width:1.5px
-    classDef fallback fill:#f0f0f0,stroke:#666,stroke-width:1px,stroke-dasharray: 5 3
+    classDef start       fill:#dff5e1,stroke:#1f8a4c,stroke-width:1.5px,color:#0e3a1d,font-weight:600;
+    classDef step        fill:#d0e7ff,stroke:#3b82c9,stroke-width:1.5px,color:#0b3d6b,font-weight:600;
+    classDef gate        fill:#fff3cd,stroke:#a07b00,stroke-width:1.2px,color:#5a4500;
+    classDef hardgate    fill:#ffe0e0,stroke:#c80000,stroke-width:2.5px,color:#5a1414,font-weight:600;
+    classDef termGood    fill:#c8f1d6,stroke:#1f8a4c,stroke-width:1.5px,color:#0e3a1d,font-weight:600;
+    classDef termBad     fill:#f9d6d6,stroke:#a83232,stroke-width:1.5px,color:#5a1414,font-weight:600;
+    classDef termNeutral fill:#e8e8e8,stroke:#888,stroke-width:1px,color:#222;
+    classDef fallback    fill:#f0f0f0,stroke:#888,stroke-width:1px,stroke-dasharray:5 3,color:#333;
 
+    class Start start
     class Q0,Q1,Q3 gate
     class Q2 hardgate
-    class Start,EndNode terminal
+    class EndNode termGood
     class Step0,Step1A,Step1B,Step1C,Step1D,GapProbe,Step2,Step3,Step4,Step5,Step6,Step7,Step8 step
     class Fallback,Reject1,Reject2,Demote fallback
 ```
