@@ -8,8 +8,8 @@ description: >
   regression guard (what to monitor); this skill *builds* it — the tests that stop a regression
   from ever shipping. Use after a build agent implements a process-design spec, after writing
   or changing any code you intend to rely on, or when the user says "add tests", "get this to
-  100% coverage", "lock in the conventions", "write a regression suite", "harden this", or
-  "make this trustworthy". Trigger proactively the moment code is declared "done" but before
+  100% coverage", "lock in the conventions", "write a regression suite", "harden this",
+  "make this trustworthy", or "add logging / improve observability". Trigger proactively the moment code is declared "done" but before
   it is relied on — the test pass is where the real bugs fall out.
 compatibility: >
   Runs in any environment with the project's test runner and a coverage tool
@@ -36,6 +36,7 @@ The procedure derives from these, not from a coverage-percentage target:
 - **P3.** Coverage is a **floor, not a goal.** 100% line coverage with weak assertions is worse than 80% with sharp ones, because it lies. A branch the data can never reach is not a real gap.
 - **P4.** A failing test *while writing the suite* is **the point, not an annoyance** — it's a real bug caught before production.
 - **P5.** Untestable code is a **design smell.** If you must contort to test it, refactor for testability first.
+- **P6.** A path you can't **observe** is a path you can't debug. Every important path — each decision rule, gate, and failure branch — should emit a **useful log** (what happened, with the values that decided it), and that log is itself an asserted behavior, not a side effect left to chance.
 
 ---
 
@@ -86,6 +87,15 @@ Each **uncovered line/branch** is a question. Answer it, don't paper over it:
 
 Each **failing test** is a finding → fix the **root cause**, not the test. If the same class of failure recurs, route it through root-cause analysis (qa-agents Phase 5) before continuing. Re-run. Repeat until the invariants are locked and the coverage target is met **with every exclusion named**.
 
+### Phase 4b — Cover the logging (observability is part of the guard)
+
+Tests prove a path is *correct*; logs are how you find out *which* path ran when something goes wrong in production. **Review the system's logging and add missing coverage until every important path produces useful, tested logs.**
+
+- **Walk the important paths** — the same list from Phase 0 (decision rules, gates, failure/error branches) plus anything that retries, falls back, or silently swallows. Each should answer, in the logs, *what happened and which values decided it*.
+- **A useful log is specific.** Log the deciding values (the weight applied, the gate's verdict, the row count excluded, the error and its context), at the right level: `error`/`warn` for failures and rejected paths, `info` for the decisions a reader would want to reconstruct, `debug` for the rest. A bare `"done"` or a swallowed exception with no log is a gap.
+- **Test the logs you rely on.** A log that matters is an assertion: capture output (`caplog`, a test handler/transport, captured stdout) and assert the important path logged what it should — especially the **failure and rejected-gate paths**, where logs are the only forensic trail. Don't assert on cosmetic phrasing; assert the *fact and the value*.
+- **Each missing log is a finding**, handled like an uncovered branch: add the log if the path matters, or decide the path doesn't warrant one — and say which in the report. Don't pad with noise logs nothing reads, the logging twin of vanity tests (P1).
+
 ### Phase 5 — Lock it in
 
 Wire the suite into the project so it runs without being remembered: a test script in the manifest, a `fail_under` / coverage threshold, and a pre-commit or CI hook if the project has one. Then report (see Output).
@@ -111,6 +121,7 @@ A coverage number is a claim. These keep it true:
    - Coverage: statements **and** branches, per logic module.
    - **Excluded-lines list** with a one-line reason each.
    - **Bugs surfaced and fixed** during the pass (the high-value half).
+   - **Logging coverage:** important paths that gained logs (and any tested), plus paths deliberately left unlogged with the reason.
    - Refactors made for testability (and how behavior was proven unchanged).
 
 ---
