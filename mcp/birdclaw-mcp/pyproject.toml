@@ -1,0 +1,20 @@
+[project]
+name = "birdclaw-mcp"
+version = "0.1.0"
+description = "MCP server wrapping the birdclaw CLI — read & analyze your own X data from Claude Desktop."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.2.0",
+]
+
+[project.scripts]
+birdclaw-mcp = "server:mcp.run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["server.py"]
+sources = ["."]
