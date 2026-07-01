@@ -16,10 +16,6 @@ The plugin bundles four supporting skill families that `process-design` calls an
 - **`elons-operating-algorithm`** — one-shot pressure test of any artifact (spec, plan, architecture, roadmap, feature list, process). Runs Elon's full 5-step Operating Algorithm in strict order — *question every requirement → delete → simplify → accelerate → automate* — and produces a structured deletion-first review note with verdicts (KEEP / QUESTION / DECOUPLE / DEFER / DELETE / SIMPLIFY), a "what survives" synthesis, a 10% add-back log, and a deepest-question reframe. Modeled on the Bean Counter Architecture Pressure Test that compressed a 20-story roadmap to 8.
 - **`test-loop`** — builds the **executable regression guard**: writes the tests that lock a spec's decision rules and the project's conventions into assertions, measures coverage (statements + branches), and treats every failure it surfaces as a bug to fix at the root. The executable companion to `dmaic-control` — DMAIC *defines* the regression guard; this *builds* the code half. Run it on the output of a `process-design` Step 7 handoff, or any time code is declared "done" but not yet trusted.
 
-Plus one optional **data-source** skill, independent of the process-design chain:
-
-- **`birdclaw`** — read and analyze **your own** X/Twitter data from a local [birdclaw](https://birdclaw.sh) workspace (timeline, mentions, bookmarks, likes, DMs in local SQLite with full-text search). Pulls a slice as JSONL and analyzes it three ways: a plain-language overview via birdclaw's native AI digest, targeted extraction via full-text search, or an **adversarial pass that hands the JSONL to `qa-agents`** to stress-test a take or thread before you post. Scope is your own account only — it can't fetch arbitrary public tweets or topic firehoses, and the skill says so rather than faking it.
-
 ## Why bundled
 
 These five are designed to compose. A spec produced by `process-design` is verified by `qa-agents` (Step 6 adversarial layer), reviewed over time via `dmaic` (Step 5 cadence handoff), pressure-tested for bloat by `elons-operating-algorithm` whenever it starts to feel overbuilt, and — once built — locked down by `test-loop` (the executable regression suite). Bundling them means you install one plugin and get a working chain. Each skill is still independently invokable as `process-design:qa-agents`, `process-design:dmaic-measure`, `process-design:elons-operating-algorithm`, etc.
@@ -55,7 +51,7 @@ Distributed deletion means every input, transition, metric, and check is challen
 /plugin install process-design@process-design-plugin
 ```
 
-That's it. All eleven skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`, `process-design:elons-operating-algorithm`, `process-design:test-loop`, `process-design:birdclaw`.
+That's it. All ten skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`, `process-design:elons-operating-algorithm`, `process-design:test-loop`.
 
 The plugin also appears in Claude Desktop's **Customize** panel automatically — a CLI install covers both surfaces.
 
@@ -177,8 +173,7 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 │           ├── dmaic-improve/
 │           ├── dmaic-control/
 │           ├── elons-operating-algorithm/   ← bundled one-shot pressure test
-│           ├── test-loop/                   ← bundled executable-regression-suite builder
-│           └── birdclaw/                     ← optional: read & analyze your own X data
+│           └── test-loop/                   ← bundled executable-regression-suite builder
 ├── dist/process-design.plugin               ← prebuilt zip for Cowork drag-and-drop
 ├── meta-spec/                               ← process-design applied to itself (v1)
 ├── build.sh                                 ← rebuild dist/process-design.plugin
@@ -190,7 +185,8 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 
 ## Versions
 
-- **v0.7.0** (current) — Adds `birdclaw`, an optional **data-source** skill that reads and analyzes your *own* X/Twitter data from a local [birdclaw](https://birdclaw.sh) workspace. It drives the birdclaw CLI to pull a slice (timeline / mentions / bookmarks / likes / search) as JSONL via a defensive `pull.py` helper, then analyzes it three ways: native AI digest for an overview, full-text search for extraction, or an adversarial handoff to `qa-agents` to stress-test a take or thread before posting. Scoped to the user's own account — it explicitly refuses arbitrary-public-tweet requests rather than faking them, and never invents rows. Independent of the process-design chain; eleven skills total.
+- **v0.7.1** (current) — Removes the `birdclaw` skill added in v0.7.0: birdclaw is a data-source experiment, not a process-design tool, so it moved to its own repo — [birdclaw-claude](https://github.com/TheMikeFactoryMustGrow/birdclaw-claude) — together with a companion MCP server for Claude Desktop. Back to ten skills; no other behavior changes.
+- **v0.7.0** — Added `birdclaw`, an optional data-source skill for reading and analyzing your own X/Twitter data via the [birdclaw](https://birdclaw.sh) CLI. Lived here for one release; moved out in v0.7.1.
 - **v0.6.0** — Bakes a **canonical flowchart format** into every spec `process-design` produces: node roles are differentiated by **shape** *and* **semantic color** (green entry/success, blue steps, amber gates, red hard-gates/failures, gray neutral/fallback), applied identically across all specs via a fixed `classDef` palette in the spec template and `SKILL.md`. Two hard rules: the Mermaid `theme` is **never locked**, so the rendered diagram follows the reader's system light/dark setting (e.g. Obsidian dark mode) while role colors stay stable; and color is always *in addition to* shape, never instead of it (the shape alone must disambiguate role). `parse_mermaid.py` now tolerates a leading `%%{init ...}%%` directive / `%%` comment before the diagram-type declaration, so specs carrying an init directive still pass the "Mermaid block parses" assertion. Still ten skills.
 - **v0.5.0** — Adds `test-loop` (builds the executable regression suite that locks a spec's decision rules and conventions into tests and surfaces real bugs in the process — the executable companion to `dmaic-control`) and a **root-cause-analysis pass in `qa-agents`** (5 Whys on confirmed major findings, routed to `test-loop` or `dmaic-control`). `process-design` Step 7's build prompt now requires a spec-locking regression suite; `dmaic-control` notes that for coded processes the test suite is the primary regression guard. Ten skills total.
 - **v0.4.0** — Adds `elons-operating-algorithm`: one-shot pressure test running Elon's full 5-step algorithm (question → delete → simplify → accelerate → automate) against any artifact, producing a structured deletion-first review note. Nine skills total.
