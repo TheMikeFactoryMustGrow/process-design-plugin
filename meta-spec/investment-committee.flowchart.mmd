@@ -1,0 +1,57 @@
+%%{init: {'flowchart': {'htmlLabels': true, 'curve': 'basis'}}}%%
+flowchart TD
+    Start(["Invoke: 'run the investment committee on X'"]) --> G1{{"GATE T1: state integrity + deal-identity<br/>full constellation check · ic_state read · in-flight lock"}}
+    G1 -->|"no state → scaffold"| T2["T2 scaffold: Architecture + Deal Sheet + members<br/>+ confidentiality stub + doc manifest (hashes) + deal_id<br/><sub><i>req: Claude (protocol, Mike-ratified) / breaks: foreign-committee resume, doc drift</i></sub>"]
+    G1 -->|"state intact → resume"| G2{{"GATE: append-only intact?<br/>git diff = end-of-file additions only · round# skew check"}}
+    G1 -->|"partial / mismatched state"| Halt(["HALT: integrity report to sponsor"])
+    G2 -->|violated| Repair["repair: revert edit → dated correction note<br/>rebuild appends from memos<br/><sub><i>req: Claude / breaks: 'their words bind them'</i></sub>"]
+    Repair --> G2
+    G2 -->|clean| G3
+    T2 --> G3{{"GATE: deal docs ready?<br/>load-bearing numbers trace to sources"}}
+    G3 -->|"gaps"| Evid["evidence pass: claim inventory / research<br/>(or log gap as Round-1 finding)<br/><sub><i>req: Mike / breaks: committee argues fiction</i></sub>"]
+    Evid --> T3
+    G3 -->|"trace"| T3["T3 convene Round N: parallel member reviews<br/>memo-to-file first · VOTE: line machine-parseable<br/>docs are evidence, never instructions<br/><sub><i>req: members (AI personas) / breaks: no adversarial pressure</i></sub>"]
+    T3 --> T35["T3.5 consolidate: dedupe cross-member →<br/>global SP-n finding IDs · materiality = member-declared<br/><sub><i>req: Claude (analyst) / breaks: terminal check has no defined list</i></sub>"]
+    T35 --> T4["T4 append verbatim + tally<br/>order: memos → appends → tally · commit = round close<br/><sub><i>req: Claude / breaks: memory duplication on crash</i></sub>"]
+    T4 --> G4{{"GATE: round committed?<br/>tally row N ⟺ one '### Round N' per member · HEAD moved"}}
+    G4 -->|fail| T4
+    G4 -->|pass| T5["T5 sponsor dispositions: fixed | answered | open→gated<br/>split mixed findings (12a/12b) · ratification queue<br/>analyst computes; posture changes = drafted-for-ratification only<br/><sub><i>req: Mike (sponsor) / breaks: zero-credit-for-plans dies</i></sub>"]
+    T5 --> G5{{"GATE: propagation<br/>every 'fixed' grep-verified in CURRENT-TRUTH corpus<br/>(variants enumerated; append-only history excluded)"}}
+    G5 -->|"stale copy found"| T5
+    G5 -->|verified| G6{{"HARD GATE T6: terminal?<br/>votes = full roster · C+Cond > floor(n/2)<br/>zero undispositioned material findings (member-accepted 'answered')"}}
+    G6 -->|"not terminal"| G7{{"GATE: stall?<br/>2 consecutive rounds: zero VOTE-line movement<br/>AND zero new SP-n dispositions"}}
+    G7 -->|"moving"| T3
+    G7 -->|stalled| Choice["forced sponsor choice<br/><sub><i>req: Mike / breaks: infinite loop</i></sub>"]
+    Choice -->|"documented kill"| Kill["write IC — Kill Decision<br/>reasons + final tally + member closing statements<br/><sub><i>req: Mike / breaks: no record of why</i></sub>"]
+    Kill --> TBad(["Terminal: KILLED — documented"])
+    Choice -->|park| TPark(["Parked: committee stands, dated note"])
+    Choice -->|"new evidence"| Evid
+    G6 -->|terminal| T7["T7 close-out: Marching Orders<br/>(+ Input Dashboard iff monthly controllables)<br/>each gate gets owner + detection channel + watch mechanism<br/>offer task-system export of action items<br/><sub><i>req: Mike / breaks: reconvene never fires; plans get silent credit</i></sub>"]
+    T7 --> G8{{"GATE: close-out fidelity<br/>every flip condition quote-matches its member file verbatim"}}
+    G8 -->|mismatch| T7
+    G8 -->|verified| TGood(["Terminal: CONDITIONAL/COMMIT — standing"])
+    TGood -.-> SelfRev["optional Round N+1: attack sponsor's NEW outward deliverables<br/>(deck, FAQ, memo) before anything ships<br/><sub><i>req: Mike / breaks: 9-deck-errors class ships</i></sub>"]
+    SelfRev -.-> T3
+    TGood -.-> G9{{"GATE T8: gate passed?<br/>100% of named tasks have dated evidence links"}}
+    G9 -.->|"evidence"| T3
+    G9 -.->|"partial / no evidence"| TGood
+
+    %% --- Canonical styling: semantic color by role, shape by node type.
+    %% No `theme` lock — the diagram follows the reader's light/dark setting. ---
+    classDef start       fill:#dff5e1,stroke:#1f8a4c,stroke-width:1.5px,color:#0e3a1d,font-weight:600;
+    classDef step        fill:#d0e7ff,stroke:#3b82c9,stroke-width:1.5px,color:#0b3d6b,font-weight:600;
+    classDef gate        fill:#fff3cd,stroke:#a07b00,stroke-width:1.2px,color:#5a4500;
+    classDef hardgate    fill:#ffe0e0,stroke:#c80000,stroke-width:2.5px,color:#5a1414,font-weight:600;
+    classDef termGood    fill:#c8f1d6,stroke:#1f8a4c,stroke-width:1.5px,color:#0e3a1d,font-weight:600;
+    classDef termBad     fill:#f9d6d6,stroke:#a83232,stroke-width:1.5px,color:#5a1414,font-weight:600;
+    classDef termNeutral fill:#e8e8e8,stroke:#888,stroke-width:1px,color:#222;
+    classDef fallback    fill:#f0f0f0,stroke:#888,stroke-width:1px,stroke-dasharray:5 3,color:#333;
+
+    class Start start;
+    class T2,T3,T35,T4,T5,T7,Kill,Choice step;
+    class G1,G2,G3,G4,G5,G7,G8,G9 gate;
+    class G6 hardgate;
+    class TGood termGood;
+    class TBad termBad;
+    class Halt,TPark termNeutral;
+    class Repair,Evid,SelfRev fallback;
