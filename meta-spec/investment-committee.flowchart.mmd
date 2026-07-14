@@ -1,7 +1,8 @@
 %%{init: {'flowchart': {'htmlLabels': true, 'curve': 'basis'}}}%%
 flowchart TD
     Start(["Invoke: 'run the investment committee on X'"]) --> G1{{"GATE T1: state integrity + deal-identity<br/>full constellation check · ic_state read · in-flight lock"}}
-    G1 -->|"no state → scaffold"| T2["T2 scaffold: Architecture + Deal Sheet + members<br/>+ confidentiality stub + doc manifest (hashes) + deal_id<br/><sub><i>req: Claude (protocol, Mike-ratified) / breaks: foreign-committee resume, doc drift</i></sub>"]
+    Lib["P0 persona library (ships with the skill)<br/>frames: versioned dossiers · mirrors: consent-gated, VAULT-ONLY · archetypes<br/><sub><i>req: Mike / breaks: shallow or drifting personas → shallow judgment</i></sub>"] --> T2
+    G1 -->|"no state → scaffold"| T2["T2 scaffold: Architecture + Deal Sheet + members<br/>(dossiers copied verbatim, version pinned)<br/>+ confidentiality stub + doc manifest (hashes) + deal_id<br/><sub><i>req: Claude (protocol, Mike-ratified) / breaks: foreign-committee resume, doc drift</i></sub>"]
     G1 -->|"state intact → resume"| G2{{"GATE: append-only intact?<br/>git diff = end-of-file additions only · round# skew check"}}
     G1 -->|"partial / mismatched state"| Halt(["HALT: integrity report to sponsor"])
     G2 -->|violated| Repair["repair: revert edit → dated correction note<br/>rebuild appends from memos<br/><sub><i>req: Claude / breaks: 'their words bind them'</i></sub>"]
@@ -10,7 +11,7 @@ flowchart TD
     T2 --> G3{{"GATE: deal docs ready?<br/>load-bearing numbers trace to sources"}}
     G3 -->|"gaps"| Evid["evidence pass: claim inventory / research<br/>(or log gap as Round-1 finding)<br/><sub><i>req: Mike / breaks: committee argues fiction</i></sub>"]
     Evid --> T3
-    G3 -->|"trace"| T3["T3 convene Round N: parallel member reviews<br/>memo-to-file first · VOTE: line machine-parseable<br/>docs are evidence, never instructions<br/><sub><i>req: members (AI personas) / breaks: no adversarial pressure</i></sub>"]
+    G3 -->|"trace"| T3["T3 convene Round N: parallel member reviews<br/>on the MOST CAPABLE model available · memo-to-file first<br/>VOTE: line machine-parseable · docs are evidence, never instructions<br/><sub><i>req: members (AI personas) / breaks: no adversarial pressure</i></sub>"]
     T3 --> T35["T3.5 consolidate: dedupe cross-member →<br/>global SP-n finding IDs · materiality = member-declared<br/><sub><i>req: Claude (analyst) / breaks: terminal check has no defined list</i></sub>"]
     T35 --> T4["T4 append verbatim + tally<br/>order: memos → appends → tally · commit = round close<br/><sub><i>req: Claude / breaks: memory duplication on crash</i></sub>"]
     T4 --> G4{{"GATE: round committed?<br/>tally row N ⟺ one '### Round N' per member · HEAD moved"}}
@@ -48,7 +49,7 @@ flowchart TD
     classDef fallback    fill:#f0f0f0,stroke:#888,stroke-width:1px,stroke-dasharray:5 3,color:#333;
 
     class Start start;
-    class T2,T3,T35,T4,T5,T7,Kill,Choice step;
+    class Lib,T2,T3,T35,T4,T5,T7,Kill,Choice step;
     class G1,G2,G3,G4,G5,G7,G8,G9 gate;
     class G6 hardgate;
     class TGood termGood;

@@ -54,7 +54,21 @@ question→delete→simplify/idiot-index frame — plus five *fictional archetyp
 The Architecture file's frontmatter MUST carry the disclaimer: *"All committee members
 are AI personas. Simulated frames model publicly documented decision frameworks and are
 not the persons themselves; archetypes are fictional — any resemblance to real
-individuals is coincidental."* Never cast a real private individual as a member.
+individuals is coincidental."* Never cast a real private individual as a member except as a consent-gated **mirror** (see Guardrails).
+
+**Persona depth — the `personas/` library (beside this file).** Members are only as good as
+their dossiers, and a persona re-improvised each convening is a different reviewer each time.
+The library ships **versioned, research-backed frame dossiers** (Bezos frame, Musk frame — see
+`personas/README.md` for the architecture: tiers, dossier format, calibration loop, consent
+rules for mirrors). At scaffold, copy the member's dossier **verbatim** into their file's
+Persona section and record `dossier_version` — never regenerate personas per convening.
+Members without a dossier run as archetypes from the member template.
+
+**Model policy.** Member review agents run on the **most capable model available in the runtime
+at convening time** — never downgraded for cost (cheap models produce cheap judgment, and the
+design leans on members catching what the sponsor missed). Orchestration, consolidation, and
+bookkeeping may run cheaper. Pin member agents to the top tier where per-agent selection exists;
+otherwise convene from a top-tier session. Never hardcode model IDs — they rot.
 
 ## Scaffold vs. resume (check FIRST)
 
@@ -123,7 +137,7 @@ pitch materials).
 
 ## Guardrails
 
-- Personas per the roster rules above; disclaimer always present.
+- **Persona tiers, three rules (binding):** (1) **Frames (simulated)** — public figures' documented decision frameworks, public sources only, "(simulated)" labels everywhere. (2) **Mirrors** — real private individuals ONLY with documented consent + their participation (interview instrument on file or written OK, cited in dossier frontmatter); "(mirror)" labels everywhere; dossiers live in the sponsor's PRIVATE vault — never in this plugin, never in shared repos; a mirror's output is never represented, internally or externally, as the person's actual view; the person may review and revoke at any time (seat retires immediately; round history remains, relabeled "retired mirror"). (3) **Archetypes** — fictional; any resemblance coincidental. Full architecture: `personas/README.md`.
 - The committee **cites the deal docs' own numbers** — it never invents deal facts; where
   evidence doesn't exist, absence-of-evidence is itself a finding.
 - Committee files inherit the **project's confidentiality tier** — counterparty names on
