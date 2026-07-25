@@ -9,16 +9,18 @@ The headliner skill, `process-design`, walks you through nine steps (Steps 0–8
 
 The diagram is hoisted **early** (Step 2, before metrics design) and gated on explicit user confirmation. You see the visual, you confirm it represents the procedure you intended, *then* the skill wires up metrics. This is the most important behavioral change from v0.1.0 — designed to catch wrong-design before it gets cemented.
 
-The plugin bundles four supporting skill families that `process-design` calls and that you can also invoke independently. (A fifth, **investment-committee**, graduated to its own repo: [investment-committee-plugin](https://github.com/TheMikeFactoryMustGrow/investment-committee-plugin) — standing multi-persona deal review with a versioned persona library.)
+The plugin bundles six supporting skill families that `process-design` calls and that you can also invoke independently. (A fifth, **investment-committee**, graduated to its own repo: [investment-committee-plugin](https://github.com/TheMikeFactoryMustGrow/investment-committee-plugin) — standing multi-persona deal review with a versioned persona library.)
 
 - **`qa-agents`** — adversarial three-agent review (Finder + Auditor + Referee). Step 6 of `process-design` delegates here for semantic verification; you can also invoke it directly to stress-test any artifact: code, documents, deal memos, contracts, financial models, decisions. After synthesis it runs a **root-cause-analysis pass on confirmed major findings** (5 Whys → root cause → recurrence guard), routing each fix to `test-loop` (a regression test) or `dmaic-control` (a control) so the same class of flaw can't ship again.
 - **`dmaic`** — Six Sigma cycle (Define → Measure → Analyze → Improve → Control). The Metrics Review Plan in every spec `process-design` produces points users at this skill to actually run review cycles. Five phase skills (`dmaic-define`, `dmaic-measure`, `dmaic-analyze`, `dmaic-improve`, `dmaic-control`) are individually callable for à-la-carte use.
 - **`elons-operating-algorithm`** — one-shot pressure test of any artifact (spec, plan, architecture, roadmap, feature list, process). Runs Elon's full 5-step Operating Algorithm in strict order — *question every requirement → delete → simplify → accelerate → automate* — and produces a structured deletion-first review note with verdicts (KEEP / QUESTION / DECOUPLE / DEFER / DELETE / SIMPLIFY), a "what survives" synthesis, a 10% add-back log, and a deepest-question reframe. Modeled on the Bean Counter Architecture Pressure Test that compressed a 20-story roadmap to 8.
 - **`test-loop`** — builds the **executable regression guard**: writes the tests that lock a spec's decision rules and the project's conventions into assertions, measures coverage (statements + branches), and treats every failure it surfaces as a bug to fix at the root. The executable companion to `dmaic-control` — DMAIC *defines* the regression guard; this *builds* the code half. Run it on the output of a `process-design` Step 7 handoff, or any time code is declared "done" but not yet trusted.
+- **`build-workflow`** — the **build step** for the `claude-code-workflow` target: compiles a `verified` spec into a runnable Claude Code Workflow script (deterministic control flow as plain JavaScript; judgment steps as schema-forced subagent calls; script gates as code checks; human gates as needs-decision split points), then tests it live — one happy-path run plus one seeded-failure run per agent gate — before flipping the spec to `implemented`.
+- **`system-map`** — the **system-altitude companion** for work that spans many interacting processes (`process-design` designs ONE process; this holds MANY together): process inventory, artifact contracts (which output feeds which input), a derived wiring diagram, a deletion sweep at system altitude (orphan outputs, phantom inputs, duplicate producers), and an explicit top-down/bottom-up reconciliation loop so the map and the per-process specs keep each other honest.
 
 ## Why bundled
 
-These five are designed to compose. A spec produced by `process-design` is verified by `qa-agents` (Step 6 adversarial layer), reviewed over time via `dmaic` (Step 5 cadence handoff), pressure-tested for bloat by `elons-operating-algorithm` whenever it starts to feel overbuilt, and — once built — locked down by `test-loop` (the executable regression suite). When the *decision* (not just the spec) needs standing adversarial review, the sibling [investment-committee plugin](https://github.com/TheMikeFactoryMustGrow/investment-committee-plugin) convenes a persistent multi-persona panel over it. Bundling them means you install one plugin and get a working chain. Each skill is still independently invokable as `process-design:qa-agents`, `process-design:dmaic-measure`, `process-design:elons-operating-algorithm`, etc.
+These seven are designed to compose. A spec produced by `process-design` is verified by `qa-agents` (Step 6 adversarial layer), reviewed over time via `dmaic` (Step 5 cadence handoff), pressure-tested for bloat by `elons-operating-algorithm` whenever it starts to feel overbuilt, compiled into a runnable, tested Claude Code Workflow script by `build-workflow` (when that's the build target), and — once built — locked down by `test-loop` (the executable regression suite). When the work spans many processes, `system-map` holds the altitude above all of it: `system-map` maps the boxes, `process-design` designs one box, `build-workflow` makes one box runnable. When the *decision* (not just the spec) needs standing adversarial review, the sibling [investment-committee plugin](https://github.com/TheMikeFactoryMustGrow/investment-committee-plugin) convenes a persistent multi-persona panel over it. Bundling them means you install one plugin and get a working chain. Each skill is still independently invokable as `process-design:qa-agents`, `process-design:dmaic-measure`, `process-design:elons-operating-algorithm`, etc.
 
 ## What `process-design` does, step by step
 
@@ -51,7 +53,7 @@ Distributed deletion means every input, transition, metric, and check is challen
 /plugin install process-design@process-design-plugin
 ```
 
-That's it. All ten skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`, `process-design:elons-operating-algorithm`, `process-design:test-loop`.
+That's it. All twelve skills load namespaced as `process-design:process-design`, `process-design:qa-agents`, `process-design:dmaic`, `process-design:dmaic-define` … `process-design:dmaic-control`, `process-design:elons-operating-algorithm`, `process-design:test-loop`, `process-design:build-workflow`, `process-design:system-map`.
 
 The plugin also appears in Claude Desktop's **Customize** panel automatically — a CLI install covers both surfaces.
 
@@ -163,7 +165,7 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 ├── plugins/
 │   └── process-design/                      ← plugin source
 │       ├── .claude-plugin/plugin.json       ← plugin manifest (Cowork reads this)
-│       └── skills/                          ← 10 skills
+│       └── skills/                          ← 12 skills
 │           ├── process-design/              ← headliner
 │           ├── qa-agents/                   ← bundled adversarial review + RCA
 │           ├── dmaic/                       ← bundled Six Sigma orchestrator
@@ -173,7 +175,9 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 │           ├── dmaic-improve/
 │           ├── dmaic-control/
 │           ├── elons-operating-algorithm/   ← bundled one-shot pressure test
-│           └── test-loop/                   ← bundled executable-regression-suite builder
+│           ├── test-loop/                   ← bundled executable-regression-suite builder
+│           ├── build-workflow/              ← spec → runnable, tested Workflow script
+│           └── system-map/                  ← system-altitude map + reconciliation loop
 ├── dist/process-design.plugin               ← prebuilt zip for Cowork drag-and-drop
 ├── meta-spec/                               ← process-design applied to itself (v1)
 ├── build.sh                                 ← rebuild dist/process-design.plugin
@@ -185,7 +189,9 @@ process-design-plugin/                       (this repo, also the Claude Code ma
 
 ## Versions
 
-- **v0.7.1** (current) — Removes the `birdclaw` skill added in v0.7.0: birdclaw is a data-source experiment, not a process-design tool, so it moved to its own repo — [birdclaw-claude](https://github.com/TheMikeFactoryMustGrow/birdclaw-claude) — together with a companion MCP server for Claude Desktop. Back to ten skills; no other behavior changes.
+- **v0.9.0** (current) — Adds `build-workflow` (compiles a `verified` process spec into a runnable Claude Code Workflow script — deterministic control flow as plain JavaScript, judgment steps as schema-forced subagent calls, human gates as needs-decision split points — then tests it live with a happy-path run plus one seeded-failure run per agent gate before flipping the spec to `implemented`) and `system-map` (the system-altitude companion for many interacting processes: process inventory, artifact contracts, derived wiring diagram, deletion sweep, and an explicit top-down/bottom-up reconciliation loop). Twelve skills total. Both skills were born and first live-tested in the Linglepedia vault (graph-max pattern, 2026-07-25).
+- **v0.8.2** — `investment-committee` graduated to its own repo: [investment-committee-plugin](https://github.com/TheMikeFactoryMustGrow/investment-committee-plugin).
+- **v0.7.1** — Removes the `birdclaw` skill added in v0.7.0: birdclaw is a data-source experiment, not a process-design tool, so it moved to its own repo — [birdclaw-claude](https://github.com/TheMikeFactoryMustGrow/birdclaw-claude) — together with a companion MCP server for Claude Desktop. Back to ten skills; no other behavior changes.
 - **v0.7.0** — Added `birdclaw`, an optional data-source skill for reading and analyzing your own X/Twitter data via the [birdclaw](https://birdclaw.sh) CLI. Lived here for one release; moved out in v0.7.1.
 - **v0.6.0** — Bakes a **canonical flowchart format** into every spec `process-design` produces: node roles are differentiated by **shape** *and* **semantic color** (green entry/success, blue steps, amber gates, red hard-gates/failures, gray neutral/fallback), applied identically across all specs via a fixed `classDef` palette in the spec template and `SKILL.md`. Two hard rules: the Mermaid `theme` is **never locked**, so the rendered diagram follows the reader's system light/dark setting (e.g. Obsidian dark mode) while role colors stay stable; and color is always *in addition to* shape, never instead of it (the shape alone must disambiguate role). `parse_mermaid.py` now tolerates a leading `%%{init ...}%%` directive / `%%` comment before the diagram-type declaration, so specs carrying an init directive still pass the "Mermaid block parses" assertion. Still ten skills.
 - **v0.5.0** — Adds `test-loop` (builds the executable regression suite that locks a spec's decision rules and conventions into tests and surfaces real bugs in the process — the executable companion to `dmaic-control`) and a **root-cause-analysis pass in `qa-agents`** (5 Whys on confirmed major findings, routed to `test-loop` or `dmaic-control`). `process-design` Step 7's build prompt now requires a spec-locking regression suite; `dmaic-control` notes that for coded processes the test suite is the primary regression guard. Ten skills total.
