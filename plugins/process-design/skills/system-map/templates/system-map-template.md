@@ -38,6 +38,11 @@ flowchart LR
 
 - YYYY-MM-DD: <what was deleted or simplified> — <why>. (Add-back is cheap.)
 
+## Depth Log
+
+- YYYY-MM-DD: <box> — kept closed (failed <control | decision | ownership | pain>)
+- YYYY-MM-DD: <box> — opened (passed all four)
+
 ## Reconciliation Log
 
 - YYYY-MM-DD ↓: <delta found going top-down — map assumption vs spec reality>

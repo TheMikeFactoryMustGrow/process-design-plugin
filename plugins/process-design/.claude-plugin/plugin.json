@@ -1,7 +1,7 @@
 {
   "name": "process-design",
-  "version": "0.9.0",
-  "description": "Process Design with extra benefits — a thought-partner skill that walks you from a fuzzy intuition to a build-ready spec via Working Backwards, metrics-first design, Elon's algorithm, gap probing, TDD-style verification, drafting, adversarial verification, and an implementation-agnostic build handoff. Bundles qa-agents (adversarial three-agent review, now with a root-cause-analysis pass on confirmed major findings) for Phase 7 verification, the dmaic skill family (Define / Measure / Analyze / Improve / Control) for metrics review cycles, elons-operating-algorithm (one-shot pressure test that runs Elon's full 5-step algorithm against any artifact — spec, plan, architecture, roadmap — and produces a structured deletion-first review), test-loop (builds the executable regression suite that locks a spec's decision rules and conventions into tests and surfaces real bugs in the process — the executable companion to dmaic-control), build-workflow (compiles a verified spec into a runnable Claude Code Workflow script and tests every gate's fail branch live before marking the spec implemented), and system-map (the system-altitude view for many interacting processes: process inventory, artifact contracts, derived wiring diagram, deletion sweep, and a top-down/bottom-up reconciliation loop). All twelve skills callable independently.",
+  "version": "0.10.0",
+  "description": "Process Design with extra benefits — a thought-partner skill that walks you from a fuzzy intuition to a build-ready spec via Working Backwards, metrics-first design, Elon's algorithm, gap probing, TDD-style verification, drafting, adversarial verification, and an implementation-agnostic build handoff. Bundles qa-agents (adversarial three-agent review, now with a root-cause-analysis pass on confirmed major findings) for Phase 7 verification, the dmaic skill family (Define / Measure / Analyze / Improve / Control) for metrics review cycles, elons-operating-algorithm (one-shot pressure test that runs Elon's full 5-step algorithm against any artifact — spec, plan, architecture, roadmap — and produces a structured deletion-first review), test-loop (builds the executable regression suite that locks a spec's decision rules and conventions into tests and surfaces real bugs in the process — the executable companion to dmaic-control), build-workflow (compiles a verified spec into a runnable Claude Code Workflow script and tests every gate's fail branch live before marking the spec implemented), system-map (the system-altitude view for many interacting processes: process inventory, artifact contracts, derived wiring diagram, four stopping tests that bound decomposition depth, deletion sweep, and a top-down/bottom-up reconciliation loop), and system-build-loop (the autonomous ramble-in, ratified-system-out orchestrator: charter, map, three-layer research fan-out, soft-fail design descent, selective builds, reconcile ascent, and one batched decision review — asks nothing mid-run except at two defined stuck points). All thirteen skills callable independently.",
   "author": {
     "name": "Mike Lingle"
   },
@@ -19,7 +19,9 @@
     "dmaic",
     "six-sigma",
     "build-workflow",
-    "system-map"
+    "system-map",
+    "system-build-loop",
+    "autonomous"
   ],
   "license": "MIT"
 }

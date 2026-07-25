@@ -15,10 +15,13 @@ description: >-
   system like "building a car" with many parallel processes that come together. Also
   use when a process-design session discovers its steps are actually whole processes,
   and after any process-design or build-workflow run, to reconcile the map against
-  what the detail work taught.
+  what the detail work taught. Includes four stopping tests (control, decision,
+  ownership, pain) that bound decomposition depth — a box must pass all four to
+  earn another level down, which is how the map avoids descending from "eat the
+  food" toward cellular metabolism.
 compatibility: >-
   Pure markdown reasoning — runs in any environment, no special tools required.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # system-map — hold the big picture while doing the detail work
@@ -50,6 +53,52 @@ of evaporating.
   disguise. Go up a level.
 - Discovering mid-flight that you are at the wrong altitude is normal. Hand off to
   the other skill and carry the material across — nothing is wasted.
+
+## Stopping rules (how deep to go)
+
+Decomposition is a cost. A box earns another level down only when it passes ALL
+four tests. Fail any one and the box stays closed — model it as a contract, not
+a design.
+
+1. **Control** — can you or your org change what happens inside the box? If not
+   (digestion, a customer's procurement committee, the weather), mark it
+   `external` and model only its contract: what goes in, what comes out, and how
+   you detect when it misbehaves.
+2. **Decision** — would the next level of detail change an action, an owner, a
+   contract, or a buy/build/delete call? If nothing you would DO changes, the
+   detail is trivia. Stop.
+3. **Ownership** — will a named person or agent in your world ever own the box's
+   internals? No owner, ever → `external`, contract only.
+4. **Pain** — is variance inside the box hurting an output metric now, or
+   blocking the system goal? Depth is pulled by observed failure, not pushed by
+   completeness. A box that works stays closed, even when it fascinates.
+
+What "closed" means depends on which test failed:
+
+- **Control or Ownership failed** → mark the box `external`: contract only
+  (inputs, outputs, misbehavior detection), no owner in the inventory.
+- **Decision failed** → the box is a primitive (send an email, write a file):
+  one atomic step inside its parent process. Never decompose a primitive, and
+  give it no inventory row of its own.
+- **Only Pain failed** → the box stays closed but KEEPS its owner and its
+  metrics in the inventory — it earns descent later, when the data says so.
+
+Corollaries:
+
+- Boxes beneath a closed box do not exist on the map. Rule on a box only when
+  its parent is open — "cellular metabolism" never gets a ruling, because
+  "digest the food" already closed.
+- When the pain sits inside an uncontrollable box, the detection lives at the
+  contract edge (stall timers, freshness checks, SLA alarms) and the response
+  belongs to the nearest controllable box upstream or downstream.
+- Elon's algorithm applies vertically: every LEVEL is a requirement that must
+  justify itself, exactly like every step. Depth bloat is still bloat.
+- Healthy systems bottom out at two to three levels (map → processes → steps).
+  A fourth level is a smell: either a mid-level box is missing, or you are
+  designing something you cannot control.
+- Record every ruling in the map's Depth Log — "opened (passed all four)" or
+  "kept closed (failed <test>)". Rulings are cheap to revisit when the Pain
+  test flips.
 
 ## Phase 1 — Anchor (Working Backwards at system altitude)
 
@@ -105,7 +154,8 @@ the sweep is not cutting deep enough.
 
 Two directions. Run whichever matches where the new information is:
 
-- **Top-down (map → detail):** pick the highest-leverage `not-designed` box → run
+- **Top-down (map → detail):** pick the highest-leverage `not-designed` box —
+  apply the Stopping rules before descending; log the ruling — then run
   `process-design` on it → come back to the map: do the detailed spec's real Inputs
   and Output/Consumers match the contract the map assumed? Fix whichever is wrong —
   sometimes the spec reveals the map was naive, sometimes the map reveals the spec
