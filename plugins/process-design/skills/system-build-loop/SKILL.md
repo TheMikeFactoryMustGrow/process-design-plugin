@@ -70,6 +70,31 @@ On resume: read the charter → read the map → continue at the recorded phase.
 Update the charter at every phase boundary — a run that dies mid-phase must
 lose at most one phase of work.
 
+## Durable memory, compaction, and idempotency
+
+Long runs WILL have their conversation context compressed. Design for it:
+
+- **Durable notes are the only memory.** Anything not written to the charter,
+  the map, or a linked artifact is lost by design. Never rely on conversation
+  context for state. Re-read the charter and the map at every phase boundary,
+  even when memory feels fresh — after compaction it lies.
+- **Deterministic artifact homes.** Every artifact has one predictable path
+  derived from stable slugs inside the charter's `run_dir` (for example
+  `<run_dir>/briefs/<box-slug>.md`, `<run_dir>/specs/<box-slug>.md`). Before
+  creating any artifact, check the path: extend or update in place, never
+  write a second copy (the no-divergent-copies rule).
+- **Stable IDs, never renumbered.** Ledger assumption IDs (A1, A2, …), box
+  slugs, and iteration numbers are append-only identifiers. A re-run reuses
+  them; it never renumbers or forks them.
+- **Idempotent phase re-entry.** Re-running any phase after an interruption
+  must converge to the same state: detect completed work by READING artifacts
+  (does the brief exist? does the spec verify?), never by remembering. A phase
+  that finds its outputs already present records "verified present" in the
+  charter and moves on instead of regenerating.
+- **Charter as write-ahead log.** `current_phase`, `iteration`, and
+  `last_updated` change at every boundary; commit and push durable notes at
+  phase boundaries too, so a dead container loses nothing that was finished.
+
 ## Phase 0 — Charter (once per run)
 
 Extract from the ramble:

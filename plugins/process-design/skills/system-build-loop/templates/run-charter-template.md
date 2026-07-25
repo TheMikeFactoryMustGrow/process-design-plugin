@@ -6,6 +6,7 @@ last_updated: YYYY-MM-DD
 status: active # active | converged | budget-exhausted | blocked | ratified
 current_phase: 0 # 0-6; update at every phase boundary
 iteration: 1 # the iteration in progress or next to start (not iterations completed)
+run_dir: "<folder holding this run's briefs/, specs/, reports/ — all artifact paths derive from it>"
 ---
 
 # <System Name> — Build-Loop Run Charter
