@@ -21,7 +21,7 @@ on:
   pull_request:
   push:
     branches: [ main, master ]
-    tags: [ 'v*', '*--v*' ]
+    tags: [ 'v[0-9]*', '*--v[0-9]*' ]
   workflow_dispatch:
 
 permissions:
@@ -91,6 +91,9 @@ jobs:
               elif [ "$old" = "$new" ]; then
                 echo "FAIL $name: content changed but version is still $old — bump plugins/$name/.claude-plugin/plugin.json"
                 fail=1
+              elif [ "$(printf '%s\n' "$old" "$new" | sort -V | tail -n1)" != "$new" ]; then
+                echo "FAIL $name: version went backwards ($old -> $new) — clients on $old would never see this update"
+                fail=1
               else
                 echo "OK $name: $old -> $new"
               fi
@@ -110,15 +113,17 @@ jobs:
         run: |
           set -u
           case "$TAG" in
-            *--v*)
+            *--v[0-9]*)
               name="${TAG%--v*}"; ver="${TAG##*--v}"
-              actual=$(jq -r .version "plugins/$name/.claude-plugin/plugin.json" 2>/dev/null)
+              # || true: Actions runs steps with set -e; a missing plugin file must
+              # reach the FAIL diagnostic below, not kill the script with a bare exit 2
+              actual=$(jq -r .version "plugins/$name/.claude-plugin/plugin.json" 2>/dev/null) || true
               if [ "$actual" = "$ver" ]; then
                 echo "OK $TAG matches plugins/$name"
               else
                 echo "FAIL tag $TAG but plugins/$name version is ${actual:-<missing>}"; exit 1
               fi ;;
-            v*)
+            v[0-9]*)
               ver="${TAG#v}"
               if jq -r .version plugins/*/.claude-plugin/plugin.json | grep -qx "$ver"; then
                 echo "OK $TAG matches a plugin version"
