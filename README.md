@@ -44,6 +44,9 @@ Distributed deletion means every input, transition, metric, and check is challen
 
 ## Install
 
+For agents and multi-session work on this repo: **[CONTRIBUTING.md](CONTRIBUTING.md)** (branch/PR workflow + how to bump versions).
+
+
 ### Grok Skills (global across grok.com / iOS / Android)
 
 1. Download packages from [`dist/grok/`](dist/grok/) (or the bulk [`process-design-skills.zip`](dist/grok/process-design-skills.zip)).
