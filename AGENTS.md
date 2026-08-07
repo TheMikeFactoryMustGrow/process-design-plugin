@@ -20,3 +20,17 @@ Data lives under **`.agent-papercuts/`** (open list + history), not a root
 Sand: skill **papercuts** ("fix the papercuts"). Clear with `papercut resolve`
 (not hand-delete). Long cycle: **papercuts-kaizen**.
 <!-- agent-papercuts:end -->
+
+## Branch and PR workflow
+
+Agents working on this repo: **do not push straight to `main`**.
+
+1. Branch from latest `main` (`feat/`, `fix/`, `docs/`, `chore/`).
+2. Open a PR into `main`.
+3. If you changed anything under `plugins/process-design/`, bump
+   `plugins/process-design/.claude-plugin/plugin.json` version (see
+   [CONTRIBUTING.md](CONTRIBUTING.md) — PATCH / MINOR / MAJOR).
+4. If skills changed, run `./build.sh` so `dist/` stays in sync.
+
+Full rules: [CONTRIBUTING.md](CONTRIBUTING.md).
+
