@@ -7,6 +7,8 @@ version: 0.1.0
 
 # Elon's Operating Algorithm — Pressure Test
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 This skill takes any artifact and runs Elon's 5-step Operating Algorithm against it: **question requirements → delete → simplify → accelerate → automate**, in that strict order. The output is a structured pressure-test note modeled on the Bean Counter Architecture Pressure Test in the user's vault — a worked example that compressed a 20-story roadmap to 8 stories and unblocked a months-long prerequisite chain.
 
 The algorithm exists because most engineering orgs (and most product roadmaps, and most architecture docs) start at step 3 or 4 — they optimize and accelerate things that should have been deleted. The discipline lives in the *order*, not the steps themselves. Steps 1 and 2 do almost all of the real work.

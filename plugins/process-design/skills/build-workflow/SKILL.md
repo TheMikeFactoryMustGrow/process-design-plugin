@@ -2,7 +2,7 @@
 name: build-workflow
 description: >-
   Compile a verified process-design spec into a runnable Claude Code Workflow script
-  (.claude/workflows/<slug>.js), test it live, and mark the spec implemented. This is
+  (.claude/workflows/{slug}.js), test it live, and mark the spec implemented. This is
   the build step of the design→build→harden pipeline: process-design designs ONE
   process; this skill makes that one process runnable; system-map holds many processes
   together. Deterministic control flow (branches, loops, fan-out) becomes plain
@@ -24,9 +24,11 @@ version: 0.1.0
 
 # build-workflow — compile a process spec into a runnable Workflow script
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 One process-design spec in, three artifacts out:
 
-1. `.claude/workflows/<slug>.js` — the runnable Workflow script.
+1. `.claude/workflows/{slug}.js` — the runnable Workflow script.
 2. A test report with a coverage table (which graph edge each run exercised).
 3. The spec flipped `verified → implemented`, with a Change Log line that links both.
 
@@ -71,7 +73,7 @@ in `args`.
 
 ## Phase 2 — Write the script
 
-Target: `.claude/workflows/<slug>.js`. Rules:
+Target: `.claude/workflows/{slug}.js`. Rules:
 
 - `meta` block: `name` = the spec slug; `phases` mirror the spec's step groups.
 - Accept `args` as an object OR a JSON string:

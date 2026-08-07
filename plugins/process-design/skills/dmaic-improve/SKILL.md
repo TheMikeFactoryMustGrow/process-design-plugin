@@ -5,6 +5,8 @@ description: Run only the Improve phase of the Six Sigma DMAIC cycle as a standa
 
 # DMAIC — Improve Phase
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 Frame every improvement attempt as a falsifiable experiment. Hypothesis, test plan, success criterion, failure criterion. Run it. Log the result. Decide.
 
 > *"Failed experiments are data, not waste."*

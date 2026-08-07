@@ -5,6 +5,8 @@ description: Measurement-and-improvement scaffold for any process the user wants
 
 # DMAIC
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 Apply the full DMAIC cycle to a process or idea, then save a structured spec.
 
 > **Order matters.** Define before you Measure. Measure before you Analyze. Analyze before you Improve. Improve before you Control. Most people start at Improve and wonder why nothing sticks.

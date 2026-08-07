@@ -5,6 +5,8 @@ description: Run only the Define phase of the Six Sigma DMAIC cycle as a standal
 
 # DMAIC — Define Phase
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 Pin down purpose, success, and failure in three concrete sentences. Everything downstream depends on this.
 
 ---

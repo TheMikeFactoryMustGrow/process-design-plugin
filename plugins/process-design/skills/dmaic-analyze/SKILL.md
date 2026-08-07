@@ -5,6 +5,8 @@ description: Run only the Analyze phase of the Six Sigma DMAIC cycle as a standa
 
 # DMAIC — Analyze Phase
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 Two jobs, in order: (1) **Causal chain** — for every output metric, name the controllable input(s) that move it. (2) **Per-output thresholds + playbooks** — when an output goes red, what's the first action and who runs it. Without (1), you have dashboards no one can act on; without (2), you have action items no one runs.
 
 ---

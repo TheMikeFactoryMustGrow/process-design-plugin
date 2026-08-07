@@ -21,6 +21,8 @@ version: 0.1.0
 
 # Test Loop — Build the Executable Regression Guard
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 DMAIC's Control phase *defines* a regression guard. This skill *builds* the code half of it: the automated test suite that locks behavior so a future edit can't silently break it. The loop has **two products, not one** — the regression suite, and the bugs it surfaces while you write it. The second is often the more valuable.
 
 This skill ships inside the `process-design` plugin. It is the executable downstream of two siblings: `process-design` hands a spec to a build agent (its Step 7 build prompt should require this suite), and `dmaic-control` defines the monitoring guard (this skill builds the test guard that fires earlier). When `qa-agents` confirms a flaw whose root cause is "missing/weak coverage," this skill is the fix.

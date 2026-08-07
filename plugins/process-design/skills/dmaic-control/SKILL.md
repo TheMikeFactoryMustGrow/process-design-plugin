@@ -5,6 +5,8 @@ description: Run only the Control phase of the Six Sigma DMAIC cycle as a standa
 
 # DMAIC — Control Phase
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 Design the regression guard. The phase most people skip — and the reason most fixes are temporary.
 
 > *"Control is not optional. Every improvement without a regression guard is temporary."*

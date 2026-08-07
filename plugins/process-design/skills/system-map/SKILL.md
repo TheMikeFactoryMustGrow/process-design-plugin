@@ -10,7 +10,7 @@ description: >-
   own spec). Altitude test: if a box hides its own multi-step procedure, it is a
   process — use this skill; if the whole diagram executes in one run, use
   process-design. Use when the user says "map the system", "how do these processes
-  fit together", "I keep losing the big picture", "design the <X>
+  fit together", "I keep losing the big picture", "design the {domain}
   architecture/pipeline", "there are many workflows here", "zoom out", or describes a
   system like "building a car" with many parallel processes that come together. Also
   use when a process-design session discovers its steps are actually whole processes,
@@ -25,6 +25,8 @@ version: 0.2.0
 ---
 
 # system-map — hold the big picture while doing the detail work
+
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
 
 Detail work loses the big picture; big-picture work without detail gets the details
 wrong. This skill makes the oscillation between the two explicit, cheap, and logged —

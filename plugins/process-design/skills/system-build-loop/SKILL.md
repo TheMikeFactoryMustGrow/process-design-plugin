@@ -28,6 +28,8 @@ version: 0.1.0
 
 # system-build-loop — ramble in, ratified system out
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 The contract: the user gives a ramble and goes away. The loop comes back with
 thoughtful, well-reviewed, well-researched work — and one batch of decisions.
 It does not ask questions along the way, except at the two defined stuck points.

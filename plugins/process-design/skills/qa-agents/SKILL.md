@@ -20,6 +20,8 @@ version: 0.5.0
 
 # QA Agents — Adversarial Three-Agent Review
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 This skill applies an adversarial verification pattern to any artifact. The mechanism is independent of domain: it works on code, documents, financial models, contracts, deal memos, decisions, or anything else that can be examined for flaws.
 
 The three agents and their incentives:

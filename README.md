@@ -1,6 +1,6 @@
 # Process Design
 
-A Claude Code / Cowork plugin for designing processes that build agents can actually execute.
+Agent Skills for designing processes that build agents can actually execute — works on **Claude Code / Cowork**, **Grok Skills** (global across grok.com / iOS / Android), and **Grok Build**.
 
 The headliner skill, `process-design`, walks you through nine steps (Steps 0–8) and produces **two deliverables**:
 
@@ -44,7 +44,30 @@ Distributed deletion means every input, transition, metric, and check is challen
 
 ## Install
 
-### Claude Code (recommended for most colleagues)
+### Grok Skills (global across grok.com / iOS / Android)
+
+1. Download packages from [`dist/grok/`](dist/grok/) (or the bulk [`process-design-skills.zip`](dist/grok/process-design-skills.zip)).
+2. On [grok.com](https://grok.com) open **Skills** → **Upload** / **Create**.
+3. Upload each `.skill` file you want (minimum: `process-design.skill` + `qa-agents.skill`).
+4. Start a new chat and say *“Design a process for …”*.
+
+Full steps, install order, and Grok Build paths: **[docs/INSTALL-GROK.md](docs/INSTALL-GROK.md)**.
+
+Claude-native instructions inside the skills are **unchanged**. On Grok, agents map tool names via `references/agent-runtimes.md`.
+
+### Grok Build
+
+```bash
+# project-scoped
+mkdir -p .grok/skills
+unzip -o dist/grok/process-design-skills.zip "skills/*" -d /tmp/pd
+cp -R /tmp/pd/skills/* .grok/skills/
+
+# or machine-global
+mkdir -p ~/.grok/skills && cp -R /tmp/pd/skills/* ~/.grok/skills/
+```
+
+### Claude Code (marketplace — still the best path for Claude users)
 
 ```bash
 # 1. Add this repo as a marketplace
@@ -100,6 +123,8 @@ claude plugin update process-design@process-design-plugin
 
 > **Note for Claude Desktop users:** the desktop app's personal-plugin UI currently has no working update path for GitHub marketplaces — the Update button stays greyed out. Use the CLI commands above; the desktop app picks up the result.
 
+**Grok Skills users:** re-download the `.skill` files from `dist/grok/` (or the bulk zip) and re-upload / replace the installed skills. There is no marketplace auto-update path yet for third-party Grok skills.
+
 ## Use
 
 The headliner triggers on phrases like:
@@ -152,7 +177,7 @@ All stdlib Python 3.
 
 ## Telemetry
 
-`process-design` writes session telemetry to `$PROCESS_DESIGN_LOG_DIR/<date>-<process-slug>.jsonl`, defaulting to `~/.claude/process-design-sessions/`. Best-effort — if the destination is unreachable, the skill completes anyway with a degraded-mode warning. Output correctness does not depend on telemetry working.
+`process-design` writes session telemetry to `$PROCESS_DESIGN_LOG_DIR/<date>-<process-slug>.jsonl`, defaulting to `~/.claude/process-design-sessions/` on Claude hosts (and a project folder / `$PROCESS_DESIGN_LOG_DIR` on Grok). Best-effort — if the destination is unreachable, the skill completes anyway with a degraded-mode warning. Output correctness does not depend on telemetry working.
 
 The headline measurable signal is `post_handoff_clarification` — the rate at which the build agent comes back asking for spec clarification. A high rate indicates the spec is leaving ambiguities the build agent can't resolve. DMAIC reviews use this to drive improvements.
 
@@ -164,39 +189,45 @@ Other tracked events: `session_start`, `phase_start`, `phase_complete` (with `mo
 process-design-plugin/                       (this repo, also the Claude Code marketplace)
 ├── .claude-plugin/marketplace.json          ← marketplace manifest (Claude Code reads this)
 ├── plugins/
-│   └── process-design/                      ← plugin source
+│   └── process-design/                      ← plugin source (shared by Claude + Grok packages)
 │       ├── .claude-plugin/plugin.json       ← plugin manifest (Cowork reads this)
-│       └── skills/                          ← 13 skills
-│           ├── process-design/              ← headliner
-│           ├── qa-agents/                   ← bundled adversarial review + RCA
-│           ├── dmaic/                       ← bundled Six Sigma orchestrator
-│           ├── dmaic-define/
-│           ├── dmaic-measure/
-│           ├── dmaic-analyze/
-│           ├── dmaic-improve/
-│           ├── dmaic-control/
-│           ├── elons-operating-algorithm/   ← bundled one-shot pressure test
-│           ├── test-loop/                   ← bundled executable-regression-suite builder
-│           ├── build-workflow/              ← spec → runnable, tested Workflow script
-│           ├── system-map/                  ← system-altitude map + stopping rules + reconciliation
-│           └── system-build-loop/           ← autonomous ramble-in, ratified-system-out orchestrator
-├── dist/process-design.plugin               ← prebuilt zip for Cowork drag-and-drop
+│       ├── shared/
+│       │   └── agent-runtimes.md            ← Claude ↔ Grok tool map (also copied into each skill)
+│       └── skills/                          ← 13 skills (source of truth)
+├── scripts/
+│   ├── package_skill.py                     ← one skill → .skill (skill-creator style)
+│   └── package_for_grok.py                  ← all skills → dist/grok/
+├── dist/
+│   ├── process-design.plugin                ← Claude Cowork drag-and-drop
+│   └── grok/                                ← Grok Skills + Grok Build packages
+│       ├── *.skill
+│       └── process-design-skills.zip
+├── docs/
+│   └── INSTALL-GROK.md                      ← Grok install guide
 ├── meta-spec/                               ← process-design applied to itself (v1)
-├── build.sh                                 ← rebuild dist/process-design.plugin
+├── build.sh                                 ← rebuild Claude .plugin + Grok packages
 ├── README.md
 └── LICENSE
 ```
 
 `evals/` and `workspaces/` are present locally for skill-creator regression testing but excluded from this public repo via `.gitignore` — they're dev artifacts that aren't needed to run or install the plugin.
 
+## Build
+
+```bash
+./build.sh                     # Claude .plugin + dist/grok/*.skill
+python3 scripts/package_for_grok.py   # Grok packages only
+```
+
 ## Versions
 
-- **v0.10.0** (current) — Adds `system-build-loop`, the autonomous orchestrator: ramble in → run charter → system map with a goal per box → three-layer research fan-out (first-principles floor, legal/rules layer, prior art/creative layer) → soft-fail design descent → selective builds → bottom-up reconciliation, looping until convergence, budget exhaustion, or a genuine block; contacts the user mid-run in exactly two defined cases and returns everything else as one batched decision review. `system-map` (now v0.2.0) gains four **stopping rules** (control, decision, ownership, pain) that bound decomposition depth, with explicit per-test closed-box semantics and a Depth Log. Both changes scenario-tested with independent agent evals (stopping rules 6/6, interrupt rule 4/4, charter extraction pass) plus a verification pass on all 13 reported text ambiguities before release. Thirteen skills total.
+- **v0.11.0** (current) — Dual-runtime packaging for **Grok Skills** and **Grok Build** without forking Claude skill bodies. Adds `shared/agent-runtimes.md` (tool map), multi-runtime callout on every skill, `scripts/package_skill.py` + `package_for_grok.py` (skill-creator-style `.skill` zips), `docs/INSTALL-GROK.md`, and `dist/grok/` artifacts. Claude marketplace install path unchanged.
+- **v0.10.0** — Adds `system-build-loop`, the autonomous orchestrator: ramble in → run charter → system map with a goal per box → three-layer research fan-out (first-principles floor, legal/rules layer, prior art/creative layer) → soft-fail design descent → selective builds → bottom-up reconciliation, looping until convergence, budget exhaustion, or a genuine block; contacts the user mid-run in exactly two defined cases and returns everything else as one batched decision review. `system-map` (now v0.2.0) gains four **stopping rules** (control, decision, ownership, pain) that bound decomposition depth, with explicit per-test closed-box semantics and a Depth Log. Both changes scenario-tested with independent agent evals (stopping rules 6/6, interrupt rule 4/4, charter extraction pass) plus a verification pass on all 13 reported text ambiguities before release. Thirteen skills total.
 - **v0.9.0** — Adds `build-workflow` (compiles a `verified` process spec into a runnable Claude Code Workflow script — deterministic control flow as plain JavaScript, judgment steps as schema-forced subagent calls, human gates as needs-decision split points — then tests it live with a happy-path run plus one seeded-failure run per agent gate before flipping the spec to `implemented`) and `system-map` (the system-altitude companion for many interacting processes: process inventory, artifact contracts, derived wiring diagram, deletion sweep, and an explicit top-down/bottom-up reconciliation loop). Twelve skills total. Both skills were born and first live-tested in the Linglepedia vault (graph-max pattern, 2026-07-25).
 - **v0.8.2** — `investment-committee` graduated to its own repo: [investment-committee-plugin](https://github.com/TheMikeFactoryMustGrow/investment-committee-plugin).
 - **v0.7.1** — Removes the `birdclaw` skill added in v0.7.0: birdclaw is a data-source experiment, not a process-design tool, so it moved to its own repo — [birdclaw-claude](https://github.com/TheMikeFactoryMustGrow/birdclaw-claude) — together with a companion MCP server for Claude Desktop. Back to ten skills; no other behavior changes.
 - **v0.7.0** — Added `birdclaw`, an optional data-source skill for reading and analyzing your own X/Twitter data via the [birdclaw](https://birdclaw.sh) CLI. Lived here for one release; moved out in v0.7.1.
-- **v0.6.0** — Bakes a **canonical flowchart format** into every spec `process-design` produces: node roles are differentiated by **shape** *and* **semantic color** (green entry/success, blue steps, amber gates, red hard-gates/failures, gray neutral/fallback), applied identically across all specs via a fixed `classDef` palette in the spec template and `SKILL.md`. Two hard rules: the Mermaid `theme` is **never locked**, so the rendered diagram follows the reader's system light/dark setting (e.g. Obsidian dark mode) while role colors stay stable; and color is always *in addition to* shape, never instead of it (the shape alone must disambiguate role). `parse_mermaid.py` now tolerates a leading `%%{init ...}%%` directive / `%%` comment before the diagram-type declaration, so specs carrying an init directive still pass the "Mermaid block parses" assertion. Still ten skills.
+- **v0.6.0** — Bakes a **canonical flowchart format** into every spec `process-design` produces: node roles are differentiated by **shape** and **semantic color** (green entry/success, blue steps, amber gates, red hard-gates/failures, gray neutral/fallback), applied identically across all specs via a fixed `classDef` palette in the spec template and `SKILL.md`. Two hard rules: the Mermaid `theme` is **never locked**, so the rendered diagram follows the reader's system light/dark setting (e.g. Obsidian dark mode) while role colors stay stable; and color is always *in addition to* shape, never instead of it (the shape alone must disambiguate role). `parse_mermaid.py` now tolerates a leading `%%{init ...}%%` directive / `%%` comment before the diagram-type declaration, so specs carrying an init directive still pass the "Mermaid block parses" assertion. Still ten skills.
 - **v0.5.0** — Adds `test-loop` (builds the executable regression suite that locks a spec's decision rules and conventions into tests and surfaces real bugs in the process — the executable companion to `dmaic-control`) and a **root-cause-analysis pass in `qa-agents`** (5 Whys on confirmed major findings, routed to `test-loop` or `dmaic-control`). `process-design` Step 7's build prompt now requires a spec-locking regression suite; `dmaic-control` notes that for coded processes the test suite is the primary regression guard. Ten skills total.
 - **v0.4.0** — Adds `elons-operating-algorithm`: one-shot pressure test running Elon's full 5-step algorithm (question → delete → simplify → accelerate → automate) against any artifact, producing a structured deletion-first review note. Nine skills total.
 - **v0.3.0** — Restructured to Claude Code marketplace layout (`.claude-plugin/marketplace.json` + `plugins/` tree); repo doubles as an installable marketplace.

@@ -38,6 +38,8 @@ version: 0.4.0
 
 # Process Design (Thought-Partner Mode → Reviewable Flowchart + Build-Ready Spec)
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 This skill collaborates with the user to take a fuzzy process description (or no description, just an intuition) and harden it into a reviewable flowchart backed by an agent-readable spec.
 
 The skill's two deliverables, in priority order:

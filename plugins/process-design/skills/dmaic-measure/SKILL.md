@@ -5,6 +5,8 @@ description: Run only the Measure phase of the Six Sigma DMAIC cycle as a standa
 
 # DMAIC — Measure Phase
 
+> **Multi-runtime (Claude Code · Grok Skills · Grok Build):** Claude-native steps in this skill stay as-is on Claude Code. On Grok or other Agent Skills hosts, map tools via `references/agent-runtimes.md` (same procedure — only tool names differ).
+
 Design metrics across three categories. **Outputs** confirm whether the process is working. **Controllable inputs** are the levers the owner can move when an output goes red. **External inputs** are context that affects the output but the owner can't move — track them so you can tell drift from noise.
 
 > *Outputs confirm; inputs are the levers. A spec with outputs but no controllable inputs produces dashboards no one can act on.*
