@@ -1,0 +1,139 @@
+name: plugin-ci
+
+# CI for a Claude Code plugin-marketplace repo — three deterministic guards:
+#
+#   validate      — marketplace.json + every plugins/*/plugin.json must pass
+#                   `claude plugin validate` (pure-local check, no API key).
+#   version-guard — any change under plugins/<name>/ must bump that plugin's
+#                   plugin.json version. An unbumped change lands on GitHub but
+#                   NEVER reaches installed clients: Update compares versions,
+#                   sees no bump, and reports "up to date" while content drifts.
+#   tag-check     — a release tag must equal the plugin.json version it points
+#                   at; accepts plain vX.Y.Z and the `claude plugin tag`
+#                   format {name}--vX.Y.Z.
+#
+# Runs on PRs (blocks before merge) and on direct pushes to the default branch
+# (post-hoc red-X signal — direct push is the dominant write path here). All
+# three guards are exact checks with no judgment calls, so red always means a
+# real manifest/version/tag problem, never lint noise.
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v[0-9]*', '*--v[0-9]*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Validate marketplace manifest
+        run: claude plugin validate .
+      - name: Validate plugin manifests
+        run: |
+          set -e
+          for dir in plugins/*/; do
+            echo "--- $dir"
+            claude plugin validate "$dir"
+          done
+
+  version-guard:
+    if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Changed plugins must bump plugin.json version
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -u
+          if [ "$EVENT" = "pull_request" ]; then
+            BASE_SHA="$PR_BASE"
+          else
+            BASE_SHA="$PUSH_BASE"
+            case "$BASE_SHA" in
+              ""|0000000000000000000000000000000000000000)
+                echo "no base to diff against (new branch); skipping"; exit 0;;
+            esac
+            git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null || {
+              echo "base $BASE_SHA not in history (force push?); skipping"; exit 0; }
+          fi
+          fail=0
+          checked=0
+          for dir in plugins/*/; do
+            name=$(basename "$dir")
+            if ! git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "$dir"; then
+              checked=1
+              old=$(git show "$BASE_SHA:${dir}.claude-plugin/plugin.json" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)
+              new=$(git show "$HEAD_SHA:${dir}.claude-plugin/plugin.json" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)
+              if [ -z "$old" ]; then
+                echo "OK $name: new plugin at version ${new:-<none>}"
+              elif [ -z "$new" ]; then
+                echo "OK $name: plugin removed"
+              elif [ "$old" = "$new" ]; then
+                echo "FAIL $name: content changed but version is still $old — bump plugins/$name/.claude-plugin/plugin.json"
+                fail=1
+              elif [ "$(printf '%s\n' "$old" "$new" | sort -V | tail -n1)" != "$new" ]; then
+                echo "FAIL $name: version went backwards ($old -> $new) — clients on $old would never see this update"
+                fail=1
+              else
+                echo "OK $name: $old -> $new"
+              fi
+            fi
+          done
+          [ "$checked" = 0 ] && echo "no plugin content changed"
+          exit $fail
+
+  tag-check:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match plugin.json version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -u
+          case "$TAG" in
+            *--v[0-9]*)
+              name="${TAG%--v*}"; ver="${TAG##*--v}"
+              # || true: Actions runs steps with set -e; a missing plugin file must
+              # reach the FAIL diagnostic below, not kill the script with a bare exit 2
+              actual=$(jq -r .version "plugins/$name/.claude-plugin/plugin.json" 2>/dev/null) || true
+              if [ "$actual" = "$ver" ]; then
+                echo "OK $TAG matches plugins/$name"
+              else
+                echo "FAIL tag $TAG but plugins/$name version is ${actual:-<missing>}"; exit 1
+              fi ;;
+            v[0-9]*)
+              ver="${TAG#v}"
+              if jq -r .version plugins/*/.claude-plugin/plugin.json | grep -qx "$ver"; then
+                echo "OK $TAG matches a plugin version"
+              else
+                echo "FAIL tag $TAG matches no plugin.json version:"
+                for f in plugins/*/.claude-plugin/plugin.json; do
+                  echo "  $f: $(jq -r .version "$f")"
+                done
+                exit 1
+              fi ;;
+            *)
+              echo "SKIP: $TAG is not a release tag" ;;
+          esac
