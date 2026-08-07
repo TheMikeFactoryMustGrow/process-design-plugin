@@ -49,25 +49,18 @@ Agents cannot flip these settings for you — enable them once in the UI when yo
 
 Examples: `feat/grok-packaging`, `fix/verify-spec-image-freshness`, `docs/install-grok`.
 
-### PR description (copy this)
+### PR description
 
-```markdown
-## Summary
-- What changed (1–3 bullets)
-- Why (user/agent pain)
+GitHub auto-loads **[`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)** on every new PR.
 
-## Version
-- [ ] No `plugins/` change → no version bump
-- [ ] `plugins/process-design/` changed → bumped `plugin.json` to X.Y.Z
-- [ ] README Versions section updated (if release-worthy)
+Fill it fully — especially **First principles**, **Alternatives considered**, and **How to evaluate this update**. Reviewers (human or next agent) should be able to accept/reject from the reasoning alone, not only from the diff.
 
-## Packages
-- [ ] N/A (docs/chore only)
-- [ ] Ran `./build.sh` — Claude `.plugin` + `dist/grok/*` refreshed
+Short version of the same bars:
 
-## Test plan
-- [ ] How you verified (script run, manual skill path, CI)
-```
+1. **Problem** — what was costly before?
+2. **Principle** — why this change is correct in principle?
+3. **Evaluate** — accept-if / reject-if criteria
+4. **Version + packages** — bump rules + whether `dist/` was rebuilt
 
 ## Do PRs help the next agent?
 
